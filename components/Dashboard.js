@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { Search, Download, RefreshCw, TrendingUp, TrendingDown, DollarSign, Eye, MousePointer, Users } from 'lucide-react';
 
 const mockCampaignData = [
@@ -46,17 +47,54 @@ const mockCampaignData = [
 ];
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClients, setSelectedClients] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [campaignData, setCampaignData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch real LinkedIn data when authenticated
+  useEffect(() => {
+    if (session?.accessToken) {
+      fetchLinkedInData();
+    } else {
+      // Use mock data if not authenticated
+      setCampaignData(mockCampaignData);
+      setIsLoading(false);
+    }
+  }, [session]);
+
+  const fetchLinkedInData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/linkedin');
+      if (response.ok) {
+        const data = await response.json();
+        setCampaignData(data.length > 0 ? data : mockCampaignData);
+      } else {
+        console.error('Failed to fetch LinkedIn data');
+        setCampaignData(mockCampaignData);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setCampaignData(mockCampaignData);
+    }
+    setIsLoading(false);
+    setLastUpdated(new Date());
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLastUpdated(new Date());
-    }, 60000);
+      if (session?.accessToken) {
+        fetchLinkedInData();
+      } else {
+        setLastUpdated(new Date());
+      }
+    }, 300000); // Refresh every 5 minutes
     return () => clearInterval(interval);
-  }, []);
+  }, [session]);
 
   const handleClientToggle = (clientId) => {
     setSelectedClients(prev => 
@@ -68,18 +106,21 @@ export default function Dashboard() {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
+    if (session?.accessToken) {
+      fetchLinkedInData();
+    }
     setTimeout(() => {
       setLastUpdated(new Date());
       setIsRefreshing(false);
     }, 1000);
   };
 
-  const filteredClients = mockCampaignData.filter(client =>
+  const filteredClients = campaignData.filter(client =>
     client.clientName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const aggregatedMetrics = selectedClients.length > 0
-    ? mockCampaignData
+    ? campaignData
         .filter(client => selectedClients.includes(client.clientId))
         .reduce((acc, client) => {
           client.campaigns.forEach(campaign => {
@@ -115,8 +156,59 @@ export default function Dashboard() {
     </div>
   );
 
+  if (isLoading && status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      {/* Authentication Status Banner */}
+      {!session && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-blue-900">Connect to LinkedIn</h3>
+              <p className="text-sm text-blue-700">Sign in to view your actual campaign data</p>
+            </div>
+            <button
+              onClick={() => signIn('linkedin')}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Sign in with LinkedIn
+            </button>
+          </div>
+        </div>
+      )}
+
+      {session && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-green-900">Connected to LinkedIn</h3>
+              <p className="text-sm text-green-700">
+                {campaignData === mockCampaignData 
+                  ? 'Showing sample data - awaiting Marketing API approval' 
+                  : 'Viewing live data from your accounts'}
+              </p>
+            </div>
+            <button
+              onClick={() => signOut()}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Dashboard Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">LinkedIn Campaign Manager Dashboard</h1>
         <div className="flex items-center justify-between">
@@ -138,6 +230,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-12 gap-6">
+        {/* Sidebar */}
         <div className="col-span-3 bg-white rounded-lg shadow p-6 h-fit border border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Clients</h2>
           
@@ -184,6 +277,7 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Main Content */}
         <div className="col-span-9">
           {selectedClients.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-12 text-center border border-gray-200">
@@ -246,7 +340,7 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {mockCampaignData
+                      {campaignData
                         .filter(client => selectedClients.includes(client.clientId))
                         .map(client => 
                           client.campaigns.map((campaign, idx) => (

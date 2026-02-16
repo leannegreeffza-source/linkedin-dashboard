@@ -8,24 +8,10 @@ const handler = NextAuth({
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
       authorization: {
         params: {
-          scope: 'r_liteprofile r_emailaddress',,
+          scope: 'r_liteprofile r_emailaddress',
         },
       },
+      issuer: 'https://www.linkedin.com',
+      wellKnown: 'https://www.linkedin.com/oauth/.well-known/openid-configuration',
     }),
   ],
-  callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      session.accessToken = token.accessToken;
-      return session;
-    },
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-});
-
-export { handler as GET, handler as POST };

@@ -11,7 +11,7 @@ export async function GET(request) {
   try {
     // Fetch ad accounts
     const accountsResponse = await fetch(
-      'https://api.linkedin.com/rest/adAccounts?q=search&search=(status:(values:List(ACTIVE,DRAFT)))',
+      'https://api.linkedin.com/rest/adAccounts?q=search&search=(status:(values:List(ACTIVE,DRAFT,CANCELED)))',
       {
         headers: {
           'Authorization': `Bearer ${session.accessToken}`,
@@ -22,16 +22,33 @@ export async function GET(request) {
     );
 
     if (!accountsResponse.ok) {
-      throw new Error('Failed to fetch ad accounts');
+      const errorText = await accountsResponse.text();
+      console.error('LinkedIn API Error:', errorText);
+      return NextResponse.json({ error: 'Failed to fetch ad accounts', details: errorText }, { status: accountsResponse.status });
     }
 
     const accountsData = await accountsResponse.json();
     
-    // Transform data to match your dashboard format
+    if (!accountsData.elements || accountsData.elements.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // For now, just transform account data into client format
+    // In the future, we can fetch actual campaign data for each account
     const clientData = accountsData.elements.map((account, index) => ({
       clientId: index + 1,
       clientName: account.name || `Account ${account.id}`,
-      campaigns: [] // We'll add campaign data in the next step
+      campaigns: [
+        {
+          name: 'Sample Campaign',
+          impressions: 0,
+          clicks: 0,
+          spend: 0,
+          conversions: 0,
+          ctr: 0,
+          cpc: 0
+        }
+      ]
     }));
 
     return NextResponse.json(clientData);

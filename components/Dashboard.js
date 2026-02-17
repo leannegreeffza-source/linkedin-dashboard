@@ -5,8 +5,8 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { Search, Download, RefreshCw, TrendingUp, DollarSign, Eye, MousePointer, Users, Calendar, CheckSquare, Square } from 'lucide-react';
 
 const mockCampaignData = [
-  { clientId: 1, clientName: "Acme Corp", campaigns: [{ name: "Q1 Product Launch", impressions: 125000, clicks: 3200, spend: 4500, conversions: 145, ctr: 2.56, cpc: 1.41 }, { name: "Brand Awareness", impressions: 89000, clicks: 1800, spend: 2800, conversions: 78, ctr: 2.02, cpc: 1.56 }] },
-  { clientId: 2, clientName: "TechStart Inc", campaigns: [{ name: "Lead Generation", impressions: 156000, clicks: 4100, spend: 5200, conversions: 203, ctr: 2.63, cpc: 1.27 }, { name: "Retargeting Campaign", impressions: 67000, clicks: 2300, spend: 3100, conversions: 112, ctr: 3.43, cpc: 1.35 }] },
+  { clientId: 1, clientName: "Acme Corp", campaigns: [{ name: "Q1 Product Launch", impressions: 125000, clicks: 3200, spend: 4500, conversions: 145, ctr: 2.56, cpc: 1.41 }] },
+  { clientId: 2, clientName: "TechStart Inc", campaigns: [{ name: "Lead Generation", impressions: 156000, clicks: 4100, spend: 5200, conversions: 203, ctr: 2.63, cpc: 1.27 }] },
   { clientId: 3, clientName: "Global Solutions", campaigns: [{ name: "Summer Promotion", impressions: 203000, clicks: 5600, spend: 7200, conversions: 267, ctr: 2.76, cpc: 1.29 }] },
 ];
 
@@ -25,51 +25,63 @@ export default function Dashboard() {
   const [selectedClients, setSelectedClients] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [campaignData, setCampaignData] = useState(mockCampaignData);
+  const [campaignData, setCampaignData] = useState([]);
   const [isLiveData, setIsLiveData] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [totalAccounts, setTotalAccounts] = useState(0);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const defaultDates = PRESETS[0].getValue();
   const [startDate, setStartDate] = useState(defaultDates.start);
   const [endDate, setEndDate] = useState(defaultDates.end);
   const [activePreset, setActivePreset] = useState('This Month');
 
-  const fetchLinkedInData = useCallback(async (start = startDate, end = endDate) => {
+  const fetchLinkedInData = useCallback(async (start, end) => {
+    const s = start || startDate;
+    const e = end || endDate;
     setIsLoading(true);
+    setDataLoaded(false);
+    setSearchTerm(''); // Clear search when fetching new data
+    setSelectedClients([]); // Clear selections
     try {
-      const response = await fetch(`/api/linkedin?startDate=${start}&endDate=${end}`);
+      const response = await fetch(`/api/linkedin?startDate=${s}&endDate=${e}`);
       if (response.ok) {
         const data = await response.json();
-        if (data && data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
           setCampaignData(data);
           setTotalAccounts(data.length);
           setIsLiveData(true);
         } else {
           setCampaignData(mockCampaignData);
+          setTotalAccounts(mockCampaignData.length);
           setIsLiveData(false);
         }
       } else {
         setCampaignData(mockCampaignData);
+        setTotalAccounts(mockCampaignData.length);
         setIsLiveData(false);
       }
     } catch (error) {
+      console.error('Fetch error:', error);
       setCampaignData(mockCampaignData);
+      setTotalAccounts(mockCampaignData.length);
       setIsLiveData(false);
     }
     setIsLoading(false);
+    setDataLoaded(true);
     setLastUpdated(new Date());
   }, [startDate, endDate]);
 
   useEffect(() => {
     if (session?.accessToken) {
       fetchLinkedInData();
-    } else {
+    } else if (status === 'unauthenticated') {
       setCampaignData(mockCampaignData);
-      setIsLiveData(false);
+      setTotalAccounts(mockCampaignData.length);
+      setDataLoaded(true);
     }
-  }, [session]);
+  }, [session, status]);
 
   const handleDatePreset = (preset) => {
     const dates = preset.getValue();
@@ -92,16 +104,16 @@ export default function Dashboard() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    if (session?.accessToken) {
-      await fetchLinkedInData();
-    }
-    setLastUpdated(new Date());
+    await fetchLinkedInData();
     setIsRefreshing(false);
   };
 
-  const filteredClients = campaignData.filter(client =>
-    client.clientName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter clients based on search - only when data is loaded
+  const filteredClients = dataLoaded
+    ? campaignData.filter(client =>
+        client.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
 
   const handleClientToggle = (clientId) => {
     setSelectedClients(prev =>
@@ -110,7 +122,7 @@ export default function Dashboard() {
   };
 
   const handleSelectAll = () => {
-    if (selectedClients.length === filteredClients.length) {
+    if (selectedClients.length === filteredClients.length && filteredClients.length > 0) {
       setSelectedClients([]);
     } else {
       setSelectedClients(filteredClients.map(c => c.clientId));
@@ -157,7 +169,7 @@ export default function Dashboard() {
         <div className="text-center">
           <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
           <p className="text-gray-600 text-lg font-medium">Loading dashboard...</p>
-          {isLoading && isLiveData && <p className="text-gray-500 text-sm mt-2">Fetching live data from LinkedIn...</p>}
+          <p className="text-gray-500 text-sm mt-2">Fetching LinkedIn data - this may take 30-60 seconds for large accounts...</p>
         </div>
       </div>
     );
@@ -166,7 +178,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
 
-      {/* Auth Banner */}
       {!session && (
         <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
@@ -189,29 +200,22 @@ export default function Dashboard() {
                 {isLiveData ? `✅ Connected to LinkedIn - Live Data` : '⏳ Connected to LinkedIn'}
               </h3>
               <p className={`text-sm ${isLiveData ? 'text-green-700' : 'text-yellow-700'}`}>
-                {isLiveData ? `Showing live data from ${totalAccounts} LinkedIn ad accounts` : 'Showing sample data - your LinkedIn API access is being set up'}
+                {isLiveData ? `Showing live data from ${totalAccounts} LinkedIn ad accounts` : 'Showing sample data'}
               </p>
             </div>
-            <button onClick={() => signOut()} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-              Sign Out
-            </button>
+            <button onClick={() => signOut()} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Sign Out</button>
           </div>
         </div>
       )}
 
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">LinkedIn Campaign Manager Dashboard</h1>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <p className="text-gray-600">Multi-client campaign performance tracking</p>
           <div className="flex items-center gap-4 flex-wrap">
-
-            {/* Date Range Picker */}
             <div className="relative">
-              <button
-                onClick={() => setShowDatePicker(!showDatePicker)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
+              <button onClick={() => setShowDatePicker(!showDatePicker)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 <Calendar className="w-4 h-4" />
                 <span className="text-sm font-medium">{activePreset}</span>
                 <span className="text-xs text-gray-500">({startDate} → {endDate})</span>
@@ -219,35 +223,29 @@ export default function Dashboard() {
 
               {showDatePicker && (
                 <div className="absolute right-0 top-12 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-96">
-                  {/* Presets */}
                   <div className="mb-4">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Quick Select</p>
                     <div className="grid grid-cols-3 gap-2">
                       {PRESETS.map(preset => (
-                        <button
-                          key={preset.label}
-                          onClick={() => handleDatePreset(preset)}
-                          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${activePreset === preset.label ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}
-                        >
+                        <button key={preset.label} onClick={() => handleDatePreset(preset)}
+                          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${activePreset === preset.label ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
                           {preset.label}
                         </button>
                       ))}
                     </div>
                   </div>
-
-                  {/* Custom Range */}
                   <div className="border-t border-gray-100 pt-4">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Custom Range</p>
                     <div className="flex gap-2 items-center mb-3">
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 mb-1 block">From</label>
                         <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                       </div>
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 mb-1 block">To</label>
                         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                       </div>
                     </div>
                     <button onClick={handleCustomDateApply}
@@ -270,51 +268,54 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-12 gap-6">
-        {/* Sidebar */}
         <div className="col-span-3 bg-white rounded-lg shadow p-6 h-fit border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
-              {isLiveData ? `Accounts (${totalAccounts})` : 'Select Clients'}
+              Accounts ({totalAccounts})
             </h2>
           </div>
 
-          {/* Search */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Search accounts..." value={searchTerm}
+            <input type="text" placeholder={`Search ${totalAccounts} accounts...`}
+              value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
           </div>
 
-          {/* Select All Button */}
+          {searchTerm && (
+            <p className="text-xs text-gray-500 mb-2">
+              Found {filteredClients.length} result{filteredClients.length !== 1 ? 's' : ''} for "{searchTerm}"
+            </p>
+          )}
+
           <button onClick={handleSelectAll}
             className="w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-sm text-gray-700">
-            {allSelected ? (
-              <CheckSquare className="w-4 h-4 text-blue-600" />
-            ) : someSelected ? (
-              <CheckSquare className="w-4 h-4 text-blue-400" />
-            ) : (
-              <Square className="w-4 h-4 text-gray-400" />
-            )}
+            {allSelected ? <CheckSquare className="w-4 h-4 text-blue-600" /> : someSelected ? <CheckSquare className="w-4 h-4 text-blue-400" /> : <Square className="w-4 h-4 text-gray-400" />}
             <span className="font-medium">
               {allSelected ? 'Deselect All' : `Select All (${filteredClients.length})`}
             </span>
           </button>
 
-          {/* Client List */}
           <div className="space-y-1 max-h-96 overflow-y-auto">
-            {filteredClients.map(client => (
-              <label key={client.clientId}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                <input type="checkbox" checked={selectedClients.includes(client.clientId)}
-                  onChange={() => handleClientToggle(client.clientId)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 text-sm truncate">{client.clientName}</div>
-                  <div className="text-xs text-gray-500">{client.campaigns.length} campaign{client.campaigns.length !== 1 ? 's' : ''}</div>
-                </div>
-              </label>
-            ))}
+            {filteredClients.length === 0 && searchTerm ? (
+              <p className="text-sm text-gray-500 text-center py-4">No accounts match "{searchTerm}"</p>
+            ) : filteredClients.length === 0 && !searchTerm && dataLoaded ? (
+              <p className="text-sm text-gray-500 text-center py-4">No accounts found</p>
+            ) : (
+              filteredClients.map(client => (
+                <label key={client.clientId}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                  <input type="checkbox" checked={selectedClients.includes(client.clientId)}
+                    onChange={() => handleClientToggle(client.clientId)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 text-sm truncate">{client.clientName}</div>
+                    <div className="text-xs text-gray-500">{client.campaigns.length} campaign{client.campaigns.length !== 1 ? 's' : ''}</div>
+                  </div>
+                </label>
+              ))
+            )}
           </div>
 
           {selectedClients.length > 0 && (
@@ -327,20 +328,16 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Main Content */}
         <div className="col-span-9">
           {selectedClients.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-12 text-center border border-gray-200">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Select Accounts to View Metrics</h3>
-              <p className="text-gray-600">Choose one or more accounts from the sidebar or click "Select All" to see combined campaign performance.</p>
-              {isLiveData && (
-                <p className="text-sm text-green-600 mt-3 font-medium">✅ {totalAccounts} LinkedIn accounts loaded and ready</p>
-              )}
+              <p className="text-gray-600">Search for accounts or click "Select All" to see combined campaign performance.</p>
+              {isLiveData && <p className="text-sm text-green-600 mt-3 font-medium">✅ {totalAccounts} LinkedIn accounts loaded</p>}
             </div>
           ) : (
             <>
-              {/* Metric Cards */}
               <div className="grid grid-cols-4 gap-4 mb-6">
                 <MetricCard title="Total Impressions" value={aggregatedMetrics.impressions.toLocaleString()} icon={Eye} subtitle="Reach" />
                 <MetricCard title="Total Clicks" value={aggregatedMetrics.clicks.toLocaleString()} icon={MousePointer} subtitle={`${aggregatedMetrics.ctr}% CTR`} />
@@ -348,13 +345,11 @@ export default function Dashboard() {
                 <MetricCard title="Conversions" value={aggregatedMetrics.conversions.toLocaleString()} icon={TrendingUp} subtitle={`${aggregatedMetrics.conversionRate}% rate`} />
               </div>
 
-              {/* Date Range Info */}
               <div className="mb-4 text-sm text-gray-500 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 <span>Showing data for: <strong>{startDate}</strong> to <strong>{endDate}</strong></span>
               </div>
 
-              {/* Campaign Table */}
               <div className="bg-white rounded-lg shadow border border-gray-200">
                 <div className="p-6 border-b border-gray-200">
                   <div className="flex items-center justify-between">

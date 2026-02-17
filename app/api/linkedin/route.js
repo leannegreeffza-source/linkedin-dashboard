@@ -25,7 +25,7 @@ export async function GET(request) {
       {
         headers: {
           'Authorization': `Bearer ${token.accessToken}`,
-          'LinkedIn-Version': '202411',
+          'LinkedIn-Version': '2025504',
           'X-RestLi-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -61,7 +61,7 @@ export async function GET(request) {
             {
               headers: {
                 'Authorization': `Bearer ${token.accessToken}`,
-                'LinkedIn-Version': '202411',
+                'LinkedIn-Version': '202504',
                 'X-RestLi-Protocol-Version': '2.0.0',
               },
             }

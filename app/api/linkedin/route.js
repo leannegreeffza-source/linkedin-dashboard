@@ -44,7 +44,7 @@ export async function GET(request) {
       const elements = accountsData.elements || [];
       allAccounts = [...allAccounts, ...elements];
 
-      if (elements.length < pageSize || allAccounts.length >= 1000) break;
+      if (elements.length < pageSize || allAccounts.length >= 2000) break;
       start += pageSize;
     }
 

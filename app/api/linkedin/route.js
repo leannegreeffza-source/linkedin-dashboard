@@ -5,173 +5,139 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET
-    });
-
-    if (!token || !token.accessToken) {
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    if (!token?.accessToken) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
+    const mode = searchParams.get('mode') || 'accounts';
+    const accountIds = searchParams.get('accountIds');
     const startDate = searchParams.get('startDate') || getDefaultStartDate();
     const endDate = searchParams.get('endDate') || getDefaultEndDate();
 
-    const [startYear, startMonth, startDay] = startDate.split('-');
-    const [endYear, endMonth, endDay] = endDate.split('-');
+    // MODE 1: Just fetch account list (fast)
+    if (mode === 'accounts') {
+      let allAccounts = [];
+      let start = 0;
+      const pageSize = 100;
 
-    // Fetch ALL ad accounts with pagination
-    let allAccounts = [];
-    let start = 0;
-    const pageSize = 100;
+      while (allAccounts.length < 2000) {
+        const res = await fetch(
+          `https://api.linkedin.com/rest/adAccounts?q=search&pageSize=${pageSize}&start=${start}`,
+          { headers: getHeaders(token.accessToken) }
+        );
+        if (!res.ok) break;
+        const data = await res.json();
+        const elements = data.elements || [];
+        allAccounts = [...allAccounts, ...elements];
+        if (elements.length < pageSize) break;
+        start += pageSize;
+      }
 
-    while (true) {
-      const accountsResponse = await fetch(
-        `https://api.linkedin.com/rest/adAccounts?q=search&pageSize=${pageSize}&start=${start}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token.accessToken}`,
-            'Linkedin-Version': '202504',
-            'X-RestLi-Protocol-Version': '2.0.0',
-          },
-        }
+      const accounts = allAccounts.map(a => ({
+        clientId: a.id,
+        clientName: a.name || `Account ${a.id}`,
+        campaigns: [],
+      }));
+
+      return NextResponse.json(accounts);
+    }
+
+    // MODE 2: Fetch campaigns + analytics for specific accounts
+    if (mode === 'campaigns' && accountIds) {
+      const ids = accountIds.split(',').filter(Boolean);
+      const [sy, sm, sd] = startDate.split('-');
+      const [ey, em, ed] = endDate.split('-');
+
+      const results = await Promise.all(
+        ids.map(async (accountId) => {
+          try {
+            // Fetch campaigns - try without encoding first
+            const campaignUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(urn:li:sponsoredAccount:${accountId})))&pageSize=100`;
+            const campaignRes = await fetch(campaignUrl, { headers: getHeaders(token.accessToken) });
+
+            if (!campaignRes.ok) {
+              const err = await campaignRes.text();
+              console.error(`Campaign error for ${accountId}:`, err);
+              return { accountId, campaigns: [] };
+            }
+
+            const campaignData = await campaignRes.json();
+            const campaignElements = campaignData.elements || [];
+
+            if (campaignElements.length === 0) {
+              return { accountId, campaigns: [] };
+            }
+
+            // Fetch analytics for all campaigns at once
+            const campaignUrns = campaignElements
+              .map(c => `urn:li:sponsoredCampaign:${c.id}`)
+              .join(',');
+
+            const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))&campaigns=List(${campaignUrns})&fields=impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues`;
+
+            const analyticsRes = await fetch(analyticsUrl, { headers: getHeaders(token.accessToken) });
+
+            let analyticsMap = {};
+            if (analyticsRes.ok) {
+              const analyticsData = await analyticsRes.json();
+              (analyticsData.elements || []).forEach(el => {
+                const urn = el.pivotValues?.[0];
+                if (urn) {
+                  if (!analyticsMap[urn]) analyticsMap[urn] = { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
+                  analyticsMap[urn].impressions += el.impressions || 0;
+                  analyticsMap[urn].clicks += el.clicks || 0;
+                  analyticsMap[urn].spend += parseFloat(el.costInLocalCurrency || 0);
+                  analyticsMap[urn].conversions += el.externalWebsiteConversions || 0;
+                }
+              });
+            }
+
+            const campaigns = campaignElements.map(c => {
+              const urn = `urn:li:sponsoredCampaign:${c.id}`;
+              const a = analyticsMap[urn] || { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
+              return {
+                name: c.name || 'Unnamed Campaign',
+                status: c.status || 'UNKNOWN',
+                impressions: a.impressions,
+                clicks: a.clicks,
+                spend: parseFloat(a.spend.toFixed(2)),
+                conversions: a.conversions,
+                ctr: a.impressions > 0 ? parseFloat((a.clicks / a.impressions * 100).toFixed(2)) : 0,
+                cpc: a.clicks > 0 ? parseFloat((a.spend / a.clicks).toFixed(2)) : 0,
+              };
+            });
+
+            return { accountId, campaigns };
+          } catch (err) {
+            console.error(`Error for account ${accountId}:`, err.message);
+            return { accountId, campaigns: [] };
+          }
+        })
       );
 
-      if (!accountsResponse.ok) break;
-
-      const accountsData = await accountsResponse.json();
-      const elements = accountsData.elements || [];
-      allAccounts = [...allAccounts, ...elements];
-
-      if (elements.length < pageSize || allAccounts.length >= 2000) break;
-      start += pageSize;
+      return NextResponse.json(results);
     }
 
-    console.log(`Total accounts: ${allAccounts.length}`);
-
-    if (allAccounts.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    // Process accounts
-    const clientData = await Promise.all(
-      allAccounts.map(async (account) => {
-        try {
-          const accountUrn = `urn:li:sponsoredAccount:${account.id}`;
-          const encodedUrn = encodeURIComponent(accountUrn);
-
-          // Fetch campaigns using account URN
-          const campaignsResponse = await fetch(
-            `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(${encodedUrn})))&pageSize=50`,
-            {
-              headers: {
-                'Authorization': `Bearer ${token.accessToken}`,
-                'Linkedin-Version': '202504',
-                'X-RestLi-Protocol-Version': '2.0.0',
-              },
-            }
-          );
-
-          let campaigns = [];
-
-          if (campaignsResponse.ok) {
-            const campaignsData = await campaignsResponse.json();
-            const campaignElements = campaignsData.elements || [];
-
-            if (campaignElements.length > 0) {
-              // Fetch analytics for all campaigns in one call
-              const campaignUrnList = campaignElements
-                .map(c => encodeURIComponent(`urn:li:sponsoredCampaign:${c.id}`))
-                .join(',');
-
-              const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${parseInt(startYear)},month:${parseInt(startMonth)},day:${parseInt(startDay)}),end:(year:${parseInt(endYear)},month:${parseInt(endMonth)},day:${parseInt(endDay)}))&campaigns=List(${campaignUrnList})&fields=impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues`;
-
-              const analyticsResponse = await fetch(analyticsUrl, {
-                headers: {
-                  'Authorization': `Bearer ${token.accessToken}`,
-                  'Linkedin-Version': '202504',
-                  'X-RestLi-Protocol-Version': '2.0.0',
-                },
-              });
-
-              let analyticsMap = {};
-              if (analyticsResponse.ok) {
-                const analyticsData = await analyticsResponse.json();
-                (analyticsData.elements || []).forEach(el => {
-                  const urn = el.pivotValues?.[0];
-                  if (urn) {
-                    if (!analyticsMap[urn]) {
-                      analyticsMap[urn] = { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
-                    }
-                    analyticsMap[urn].impressions += el.impressions || 0;
-                    analyticsMap[urn].clicks += el.clicks || 0;
-                    analyticsMap[urn].spend += parseFloat(el.costInLocalCurrency || 0);
-                    analyticsMap[urn].conversions += el.externalWebsiteConversions || 0;
-                  }
-                });
-              } else {
-                const analyticsError = await analyticsResponse.text();
-                console.error(`Analytics error for account ${account.id}:`, analyticsError);
-              }
-
-              campaigns = campaignElements.map(campaign => {
-                const urn = `urn:li:sponsoredCampaign:${campaign.id}`;
-                const analytics = analyticsMap[urn] || { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
-                const ctr = analytics.impressions > 0 ? (analytics.clicks / analytics.impressions * 100).toFixed(2) : 0;
-                const cpc = analytics.clicks > 0 ? (analytics.spend / analytics.clicks).toFixed(2) : 0;
-
-                return {
-                  name: campaign.name || 'Unnamed Campaign',
-                  status: campaign.status || 'UNKNOWN',
-                  impressions: analytics.impressions,
-                  clicks: analytics.clicks,
-                  spend: parseFloat(analytics.spend.toFixed(2)),
-                  conversions: analytics.conversions,
-                  ctr: parseFloat(ctr),
-                  cpc: parseFloat(cpc),
-                };
-              });
-            }
-          } else {
-            const campaignError = await campaignsResponse.text();
-            console.error(`Campaign error for account ${account.id}:`, campaignError);
-          }
-
-          if (campaigns.length === 0) {
-            campaigns = [{
-              name: 'No campaigns found',
-              status: 'NONE',
-              impressions: 0, clicks: 0, spend: 0, conversions: 0, ctr: 0, cpc: 0,
-            }];
-          }
-
-          return {
-            clientId: account.id,
-            clientName: account.name || `Account ${account.id}`,
-            campaigns,
-          };
-        } catch (err) {
-          console.error(`Error for account ${account.id}:`, err.message);
-          return {
-            clientId: account.id,
-            clientName: account.name || `Account ${account.id}`,
-            campaigns: [{ name: 'Error loading data', status: 'ERROR', impressions: 0, clicks: 0, spend: 0, conversions: 0, ctr: 0, cpc: 0 }],
-          };
-        }
-      })
-    );
-
-    return NextResponse.json(clientData);
+    return NextResponse.json({ error: 'Invalid mode' }, { status: 400 });
   } catch (error) {
     console.error('Server Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
+function getHeaders(accessToken) {
+  return {
+    'Authorization': `Bearer ${accessToken}`,
+    'Linkedin-Version': '202504',
+    'X-RestLi-Protocol-Version': '2.0.0',
+  };
+}
+
 function getDefaultStartDate() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
 }
 
 function getDefaultEndDate() {

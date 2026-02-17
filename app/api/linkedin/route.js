@@ -18,55 +18,57 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate') || getDefaultStartDate();
     const endDate = searchParams.get('endDate') || getDefaultEndDate();
 
+    const [startYear, startMonth, startDay] = startDate.split('-');
+    const [endYear, endMonth, endDay] = endDate.split('-');
+
     // Fetch ALL ad accounts with pagination
     let allAccounts = [];
-    let pageToken = null;
-    let pageCount = 0;
-    const maxPages = 20; // Support up to 1000 accounts (50 per page x 20 pages)
+    let start = 0;
+    const pageSize = 100;
+    let hasMore = true;
 
-    do {
-      let url = 'https://api.linkedin.com/rest/adAccounts?q=search&pageSize=50';
-      if (pageToken) {
-        url += `&pageToken=${pageToken}`;
-      }
-
-      const accountsResponse = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token.accessToken}`,
-          'Linkedin-Version': '202504',
-          'X-RestLi-Protocol-Version': '2.0.0',
-        },
-      });
+    while (hasMore) {
+      const accountsResponse = await fetch(
+        `https://api.linkedin.com/rest/adAccounts?q=search&pageSize=${pageSize}&start=${start}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token.accessToken}`,
+            'Linkedin-Version': '202504',
+            'X-RestLi-Protocol-Version': '2.0.0',
+          },
+        }
+      );
 
       if (!accountsResponse.ok) {
-        const errorText = await accountsResponse.text();
-        console.error('Accounts API error:', errorText);
+        console.error('Accounts API error:', await accountsResponse.text());
         break;
       }
 
       const accountsData = await accountsResponse.json();
-      
-      if (accountsData.elements) {
-        allAccounts = [...allAccounts, ...accountsData.elements];
+      const elements = accountsData.elements || [];
+      allAccounts = [...allAccounts, ...elements];
+
+      if (elements.length < pageSize) {
+        hasMore = false;
+      } else {
+        start += pageSize;
       }
 
-      // Check for next page
-      pageToken = accountsData.metadata?.nextPageToken || null;
-      pageCount++;
+      // Safety limit
+      if (allAccounts.length >= 1000) break;
+    }
 
-    } while (pageToken && pageCount < maxPages);
-
-    console.log(`Fetched ${allAccounts.length} accounts total`);
+    console.log(`Total accounts fetched: ${allAccounts.length}`);
 
     if (allAccounts.length === 0) {
       return NextResponse.json([]);
     }
 
-    // Fetch analytics for each account
+    // Process accounts in batches to avoid timeout
     const clientData = await Promise.all(
-      allAccounts.map(async (account, index) => {
+      allAccounts.map(async (account) => {
         try {
-          // Fetch campaigns for this account
+          // Fetch campaigns
           const campaignsResponse = await fetch(
             `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(urn%3Ali%3AsponsoredAccount%3A${account.id})))&pageSize=50`,
             {
@@ -84,61 +86,59 @@ export async function GET(request) {
             const campaignsData = await campaignsResponse.json();
             const campaignElements = campaignsData.elements || [];
 
-            // Fetch analytics for each campaign
-            campaigns = await Promise.all(
-              campaignElements.map(async (campaign) => {
-                try {
-                  const analyticsResponse = await fetch(
-                    `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${startDate.split('-')[0]},month:${parseInt(startDate.split('-')[1])},day:${parseInt(startDate.split('-')[2])}),end:(year:${endDate.split('-')[0]},month:${parseInt(endDate.split('-')[1])},day:${parseInt(endDate.split('-')[2])}))&campaigns=List(urn%3Ali%3AsponsoredCampaign%3A${campaign.id})&fields=impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange`,
-                    {
-                      headers: {
-                        'Authorization': `Bearer ${token.accessToken}`,
-                        'Linkedin-Version': '202504',
-                        'X-RestLi-Protocol-Version': '2.0.0',
-                      },
+            if (campaignElements.length > 0) {
+              // Fetch analytics for ALL campaigns in this account at once
+              const campaignUrns = campaignElements
+                .map(c => `urn%3Ali%3AsponsoredCampaign%3A${c.id}`)
+                .join(',');
+
+              const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${parseInt(startYear)},month:${parseInt(startMonth)},day:${parseInt(startDay)}),end:(year:${parseInt(endYear)},month:${parseInt(endMonth)},day:${parseInt(endDay)}))&campaigns=List(${campaignUrns})&fields=impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues`;
+
+              const analyticsResponse = await fetch(analyticsUrl, {
+                headers: {
+                  'Authorization': `Bearer ${token.accessToken}`,
+                  'Linkedin-Version': '202504',
+                  'X-RestLi-Protocol-Version': '2.0.0',
+                },
+              });
+
+              // Build analytics map by campaign URN
+              let analyticsMap = {};
+              if (analyticsResponse.ok) {
+                const analyticsData = await analyticsResponse.json();
+                (analyticsData.elements || []).forEach(el => {
+                  const urn = el.pivotValues?.[0];
+                  if (urn) {
+                    if (!analyticsMap[urn]) {
+                      analyticsMap[urn] = { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
                     }
-                  );
-
-                  let impressions = 0, clicks = 0, spend = 0, conversions = 0;
-
-                  if (analyticsResponse.ok) {
-                    const analyticsData = await analyticsResponse.json();
-                    const elements = analyticsData.elements || [];
-                    elements.forEach(el => {
-                      impressions += el.impressions || 0;
-                      clicks += el.clicks || 0;
-                      spend += parseFloat(el.costInLocalCurrency || 0);
-                      conversions += el.externalWebsiteConversions || 0;
-                    });
+                    analyticsMap[urn].impressions += el.impressions || 0;
+                    analyticsMap[urn].clicks += el.clicks || 0;
+                    analyticsMap[urn].spend += parseFloat(el.costInLocalCurrency || 0);
+                    analyticsMap[urn].conversions += el.externalWebsiteConversions || 0;
                   }
+                });
+              }
 
-                  const ctr = impressions > 0 ? (clicks / impressions * 100).toFixed(2) : 0;
-                  const cpc = clicks > 0 ? (spend / clicks).toFixed(2) : 0;
+              // Map campaigns with their analytics
+              campaigns = campaignElements.map(campaign => {
+                const urn = `urn:li:sponsoredCampaign:${campaign.id}`;
+                const analytics = analyticsMap[urn] || { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
+                const ctr = analytics.impressions > 0 ? (analytics.clicks / analytics.impressions * 100).toFixed(2) : 0;
+                const cpc = analytics.clicks > 0 ? (analytics.spend / analytics.clicks).toFixed(2) : 0;
 
-                  return {
-                    name: campaign.name || 'Unnamed Campaign',
-                    status: campaign.status || 'UNKNOWN',
-                    impressions,
-                    clicks,
-                    spend: parseFloat(spend.toFixed(2)),
-                    conversions,
-                    ctr: parseFloat(ctr),
-                    cpc: parseFloat(cpc),
-                  };
-                } catch (err) {
-                  return {
-                    name: campaign.name || 'Unnamed Campaign',
-                    status: campaign.status || 'UNKNOWN',
-                    impressions: 0,
-                    clicks: 0,
-                    spend: 0,
-                    conversions: 0,
-                    ctr: 0,
-                    cpc: 0,
-                  };
-                }
-              })
-            );
+                return {
+                  name: campaign.name || 'Unnamed Campaign',
+                  status: campaign.status || 'UNKNOWN',
+                  impressions: analytics.impressions,
+                  clicks: analytics.clicks,
+                  spend: parseFloat(analytics.spend.toFixed(2)),
+                  conversions: analytics.conversions,
+                  ctr: parseFloat(ctr),
+                  cpc: parseFloat(cpc),
+                };
+              });
+            }
           }
 
           if (campaigns.length === 0) {
@@ -160,20 +160,11 @@ export async function GET(request) {
             campaigns,
           };
         } catch (err) {
-          console.error(`Error for account ${account.id}:`, err);
+          console.error(`Error for account ${account.id}:`, err.message);
           return {
             clientId: account.id,
             clientName: account.name || `Account ${account.id}`,
-            campaigns: [{
-              name: 'Error loading data',
-              status: 'ERROR',
-              impressions: 0,
-              clicks: 0,
-              spend: 0,
-              conversions: 0,
-              ctr: 0,
-              cpc: 0,
-            }],
+            campaigns: [{ name: 'Error loading data', status: 'ERROR', impressions: 0, clicks: 0, spend: 0, conversions: 0, ctr: 0, cpc: 0 }],
           };
         }
       })
@@ -188,8 +179,7 @@ export async function GET(request) {
 
 function getDefaultStartDate() {
   const date = new Date();
-  date.setDate(1); // First of current month
-  return date.toISOString().split('T')[0];
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
 function getDefaultEndDate() {

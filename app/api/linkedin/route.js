@@ -25,9 +25,8 @@ export async function GET(request) {
     let allAccounts = [];
     let start = 0;
     const pageSize = 100;
-    let hasMore = true;
 
-    while (hasMore) {
+    while (true) {
       const accountsResponse = await fetch(
         `https://api.linkedin.com/rest/adAccounts?q=search&pageSize=${pageSize}&start=${start}`,
         {
@@ -39,38 +38,32 @@ export async function GET(request) {
         }
       );
 
-      if (!accountsResponse.ok) {
-        console.error('Accounts API error:', await accountsResponse.text());
-        break;
-      }
+      if (!accountsResponse.ok) break;
 
       const accountsData = await accountsResponse.json();
       const elements = accountsData.elements || [];
       allAccounts = [...allAccounts, ...elements];
 
-      if (elements.length < pageSize) {
-        hasMore = false;
-      } else {
-        start += pageSize;
-      }
-
-      // Safety limit
-      if (allAccounts.length >= 1000) break;
+      if (elements.length < pageSize || allAccounts.length >= 1000) break;
+      start += pageSize;
     }
 
-    console.log(`Total accounts fetched: ${allAccounts.length}`);
+    console.log(`Total accounts: ${allAccounts.length}`);
 
     if (allAccounts.length === 0) {
       return NextResponse.json([]);
     }
 
-    // Process accounts in batches to avoid timeout
+    // Process accounts
     const clientData = await Promise.all(
       allAccounts.map(async (account) => {
         try {
-          // Fetch campaigns
+          const accountUrn = `urn:li:sponsoredAccount:${account.id}`;
+          const encodedUrn = encodeURIComponent(accountUrn);
+
+          // Fetch campaigns using account URN
           const campaignsResponse = await fetch(
-            `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(urn%3Ali%3AsponsoredAccount%3A${account.id})))&pageSize=50`,
+            `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(${encodedUrn})))&pageSize=50`,
             {
               headers: {
                 'Authorization': `Bearer ${token.accessToken}`,
@@ -87,12 +80,12 @@ export async function GET(request) {
             const campaignElements = campaignsData.elements || [];
 
             if (campaignElements.length > 0) {
-              // Fetch analytics for ALL campaigns in this account at once
-              const campaignUrns = campaignElements
-                .map(c => `urn%3Ali%3AsponsoredCampaign%3A${c.id}`)
+              // Fetch analytics for all campaigns in one call
+              const campaignUrnList = campaignElements
+                .map(c => encodeURIComponent(`urn:li:sponsoredCampaign:${c.id}`))
                 .join(',');
 
-              const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${parseInt(startYear)},month:${parseInt(startMonth)},day:${parseInt(startDay)}),end:(year:${parseInt(endYear)},month:${parseInt(endMonth)},day:${parseInt(endDay)}))&campaigns=List(${campaignUrns})&fields=impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues`;
+              const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${parseInt(startYear)},month:${parseInt(startMonth)},day:${parseInt(startDay)}),end:(year:${parseInt(endYear)},month:${parseInt(endMonth)},day:${parseInt(endDay)}))&campaigns=List(${campaignUrnList})&fields=impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues`;
 
               const analyticsResponse = await fetch(analyticsUrl, {
                 headers: {
@@ -102,7 +95,6 @@ export async function GET(request) {
                 },
               });
 
-              // Build analytics map by campaign URN
               let analyticsMap = {};
               if (analyticsResponse.ok) {
                 const analyticsData = await analyticsResponse.json();
@@ -118,9 +110,11 @@ export async function GET(request) {
                     analyticsMap[urn].conversions += el.externalWebsiteConversions || 0;
                   }
                 });
+              } else {
+                const analyticsError = await analyticsResponse.text();
+                console.error(`Analytics error for account ${account.id}:`, analyticsError);
               }
 
-              // Map campaigns with their analytics
               campaigns = campaignElements.map(campaign => {
                 const urn = `urn:li:sponsoredCampaign:${campaign.id}`;
                 const analytics = analyticsMap[urn] || { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
@@ -139,18 +133,16 @@ export async function GET(request) {
                 };
               });
             }
+          } else {
+            const campaignError = await campaignsResponse.text();
+            console.error(`Campaign error for account ${account.id}:`, campaignError);
           }
 
           if (campaigns.length === 0) {
             campaigns = [{
               name: 'No campaigns found',
               status: 'NONE',
-              impressions: 0,
-              clicks: 0,
-              spend: 0,
-              conversions: 0,
-              ctr: 0,
-              cpc: 0,
+              impressions: 0, clicks: 0, spend: 0, conversions: 0, ctr: 0, cpc: 0,
             }];
           }
 

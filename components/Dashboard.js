@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Search, Download, RefreshCw, TrendingUp, TrendingDown, DollarSign, Eye, MousePointer, Users } from 'lucide-react';
+import { Search, Download, RefreshCw, TrendingUp, DollarSign, Eye, MousePointer, Users } from 'lucide-react';
 
 const mockCampaignData = [
   {
@@ -53,28 +53,70 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [campaignData, setCampaignData] = useState(mockCampaignData);
+  const [isLiveData, setIsLiveData] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (session?.accessToken) {
+      fetchLinkedInData();
+    } else {
+      setCampaignData(mockCampaignData);
+      setIsLiveData(false);
+    }
+  }, [session]);
+
+  const fetchLinkedInData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/linkedin');
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0) {
+          setCampaignData(data);
+          setIsLiveData(true);
+        } else {
+          setCampaignData(mockCampaignData);
+          setIsLiveData(false);
+        }
+      } else {
+        setCampaignData(mockCampaignData);
+        setIsLiveData(false);
+      }
+    } catch (error) {
+      console.error('Error fetching LinkedIn data:', error);
+      setCampaignData(mockCampaignData);
+      setIsLiveData(false);
+    }
+    setIsLoading(false);
+    setLastUpdated(new Date());
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLastUpdated(new Date());
-    }, 60000);
+      if (session?.accessToken) {
+        fetchLinkedInData();
+      } else {
+        setLastUpdated(new Date());
+      }
+    }, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [session]);
 
   const handleClientToggle = (clientId) => {
-    setSelectedClients(prev => 
-      prev.includes(clientId) 
+    setSelectedClients(prev =>
+      prev.includes(clientId)
         ? prev.filter(id => id !== clientId)
         : [...prev, clientId]
     );
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setLastUpdated(new Date());
-      setIsRefreshing(false);
-    }, 1000);
+    if (session?.accessToken) {
+      await fetchLinkedInData();
+    }
+    setLastUpdated(new Date());
+    setIsRefreshing(false);
   };
 
   const filteredClients = campaignData.filter(client =>
@@ -96,7 +138,7 @@ export default function Dashboard() {
     : null;
 
   if (aggregatedMetrics) {
-    aggregatedMetrics.ctr = aggregatedMetrics.impressions > 0 
+    aggregatedMetrics.ctr = aggregatedMetrics.impressions > 0
       ? (aggregatedMetrics.clicks / aggregatedMetrics.impressions * 100).toFixed(2)
       : 0;
     aggregatedMetrics.cpc = aggregatedMetrics.clicks > 0
@@ -118,7 +160,7 @@ export default function Dashboard() {
     </div>
   );
 
-  if (status === 'loading') {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -131,6 +173,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+
+      {/* Auth Banner */}
       {!session && (
         <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
@@ -149,11 +193,17 @@ export default function Dashboard() {
       )}
 
       {session && (
-        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className={`mb-6 border rounded-lg p-4 ${isLiveData ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-green-900">Connected to LinkedIn</h3>
-              <p className="text-sm text-green-700">Showing sample data - awaiting Marketing API approval</p>
+              <h3 className={`text-lg font-semibold ${isLiveData ? 'text-green-900' : 'text-yellow-900'}`}>
+                {isLiveData ? '✅ Connected to LinkedIn - Live Data' : '⏳ Connected to LinkedIn'}
+              </h3>
+              <p className={`text-sm ${isLiveData ? 'text-green-700' : 'text-yellow-700'}`}>
+                {isLiveData
+                  ? `Showing live data from your LinkedIn ad accounts`
+                  : `Showing sample data - your LinkedIn API access is being set up`}
+              </p>
             </div>
             <button
               onClick={() => signOut()}
@@ -165,6 +215,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">LinkedIn Campaign Manager Dashboard</h1>
         <div className="flex items-center justify-between">
@@ -186,9 +237,12 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-12 gap-6">
+        {/* Sidebar */}
         <div className="col-span-3 bg-white rounded-lg shadow p-6 h-fit border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Clients</h2>
-          
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            {isLiveData ? 'Your LinkedIn Accounts' : 'Select Clients'}
+          </h2>
+
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -232,6 +286,7 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Main Content */}
         <div className="col-span-9">
           {selectedClients.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-12 text-center border border-gray-200">
@@ -278,7 +333,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                 </div>
-                
+
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
@@ -296,7 +351,7 @@ export default function Dashboard() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {campaignData
                         .filter(client => selectedClients.includes(client.clientId))
-                        .map(client => 
+                        .map(client =>
                           client.campaigns.map((campaign, idx) => (
                             <tr key={`${client.clientId}-${idx}`} className="hover:bg-gray-50 transition-colors">
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

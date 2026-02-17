@@ -1,84 +1,66 @@
-import { getServerSession } from 'next-auth';
+import { getToken } from 'next-auth/jwt';
 import { NextResponse } from 'next/server';
-import NextAuth from 'next-auth';
-import LinkedInProvider from 'next-auth/providers/linkedin';
 
-// Auth options must match your [...nextauth]/route.js
-export const authOptions = {
-  providers: [
-    LinkedInProvider({
-      clientId: process.env.LINKEDIN_CLIENT_ID,
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
-      authorization: {
-        params: {
-          scope: 'r_liteprofile r_emailaddress r_ads r_ads_reporting',
-        },
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      session.accessToken = token.accessToken;
-      return session;
-    },
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-};
+export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  if (!session.accessToken) {
-    return NextResponse.json({ error: 'No access token' }, { status: 401 });
-  }
-
   try {
-    // Fetch your LinkedIn ad accounts
-    const accountsResponse = await fetch(
+    // Get token directly from request (more reliable than getServerSession)
+    const token = await getToken({ 
+      req: request, 
+      secret: process.env.NEXTAUTH_SECRET 
+    });
+
+    if (!token) {
+      return NextResponse.json({ error: 'Not authenticated - please sign in' }, { status: 401 });
+    }
+
+    if (!token.accessToken) {
+      return NextResponse.json({ error: 'No LinkedIn access token found' }, { status: 401 });
+    }
+
+    // Test the token with a simple profile request first
+    const profileResponse = await fetch(
       'https://api.linkedin.com/rest/adAccounts?q=search&search=(status:(values:List(ACTIVE,DRAFT)))',
       {
         headers: {
-          'Authorization': `Bearer ${session.accessToken}`,
+          'Authorization': `Bearer ${token.accessToken}`,
           'LinkedIn-Version': '202401',
           'X-RestLi-Protocol-Version': '2.0.0',
+          'Content-Type': 'application/json',
         },
       }
     );
 
-    if (!accountsResponse.ok) {
-      const errorText = await accountsResponse.text();
-      console.error('LinkedIn API Error:', errorText);
-      return NextResponse.json(
-        { error: 'LinkedIn API failed', details: errorText },
-        { status: accountsResponse.status }
-      );
+    if (!profileResponse.ok) {
+      const errorText = await profileResponse.text();
+      console.error('LinkedIn API Error Status:', profileResponse.status);
+      console.error('LinkedIn API Error Body:', errorText);
+      return NextResponse.json({ 
+        error: 'LinkedIn API request failed', 
+        status: profileResponse.status,
+        details: errorText 
+      }, { status: profileResponse.status });
     }
 
-    const accountsData = await accountsResponse.json();
+    const accountsData = await profileResponse.json();
+    console.log('LinkedIn accounts fetched:', JSON.stringify(accountsData));
 
     if (!accountsData.elements || accountsData.elements.length === 0) {
+      console.log('No ad accounts found');
       return NextResponse.json([]);
     }
 
-    // Fetch campaigns for each account
+    // Transform accounts into client format
     const clientData = await Promise.all(
       accountsData.elements.map(async (account, index) => {
         try {
+          // Fetch campaigns for this account
           const campaignsResponse = await fetch(
-            `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(urn%3Ali%3AsponsoredAccount%3A${account.id})),status:(values:List(ACTIVE,PAUSED,DRAFT)))`,
+            `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(urn%3Ali%3AsponsoredAccount%3A${account.id})))`,
             {
               headers: {
-                'Authorization': `Bearer ${session.accessToken}`,
+                'Authorization': `Bearer ${token.accessToken}`,
                 'LinkedIn-Version': '202401',
                 'X-RestLi-Protocol-Version': '2.0.0',
               },
@@ -86,11 +68,12 @@ export async function GET(request) {
           );
 
           let campaigns = [];
+
           if (campaignsResponse.ok) {
             const campaignsData = await campaignsResponse.json();
             campaigns = (campaignsData.elements || []).map(campaign => ({
               name: campaign.name || 'Unnamed Campaign',
-              impressions: campaign.totalBudget?.amount ? parseInt(campaign.totalBudget.amount) : 0,
+              impressions: 0,
               clicks: 0,
               spend: campaign.totalBudget?.amount ? parseFloat(campaign.totalBudget.amount) : 0,
               conversions: 0,
@@ -99,10 +82,9 @@ export async function GET(request) {
             }));
           }
 
-          // If no campaigns found, add a placeholder
           if (campaigns.length === 0) {
             campaigns = [{
-              name: 'No active campaigns',
+              name: 'No campaigns found',
               impressions: 0,
               clicks: 0,
               spend: 0,
@@ -114,15 +96,16 @@ export async function GET(request) {
 
           return {
             clientId: index + 1,
-            clientName: account.name || `Account ${account.id}`,
+            clientName: account.name || `LinkedIn Account ${account.id}`,
             campaigns,
           };
         } catch (err) {
+          console.error('Error fetching campaigns for account:', account.id, err);
           return {
             clientId: index + 1,
-            clientName: account.name || `Account ${account.id}`,
+            clientName: account.name || `LinkedIn Account ${account.id}`,
             campaigns: [{
-              name: 'Error loading campaigns',
+              name: 'Could not load campaigns',
               impressions: 0,
               clicks: 0,
               spend: 0,
@@ -136,8 +119,9 @@ export async function GET(request) {
     );
 
     return NextResponse.json(clientData);
+
   } catch (error) {
-    console.error('LinkedIn API Error:', error);
+    console.error('Server Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

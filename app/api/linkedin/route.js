@@ -2,6 +2,7 @@ import { getToken } from 'next-auth/jwt';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow 60 seconds for this function
 
 export async function GET(request) {
   try {
@@ -21,21 +22,24 @@ export async function GET(request) {
     };
 
     if (mode === 'accounts') {
-      console.log('Fetching all accounts...');
+      console.log('Fetching ALL accounts - no limit...');
       
       let allAccounts = [];
       let start = 0;
       const pageSize = 100;
+      let consecutiveEmptyPages = 0;
 
-      // Load up to 10000 accounts to ensure we get all 671
-      while (start < 10000) {
+      // Keep fetching until we get 3 consecutive empty pages (to be absolutely sure)
+      while (consecutiveEmptyPages < 3) {
+        console.log(`Fetching page starting at ${start}...`);
+        
         const res = await fetch(
           `https://api.linkedin.com/rest/adAccounts?q=search&pageSize=${pageSize}&start=${start}`,
           { headers }
         );
 
         if (!res.ok) {
-          console.error('Account fetch failed at start=' + start);
+          console.error(`Account fetch failed at start=${start}:`, await res.text());
           break;
         }
 
@@ -43,24 +47,36 @@ export async function GET(request) {
         const elements = data.elements || [];
         
         if (elements.length === 0) {
-          console.log('No more accounts to load');
-          break;
+          consecutiveEmptyPages++;
+          console.log(`Empty page ${consecutiveEmptyPages}/3 at start=${start}`);
+          start += pageSize; // Continue checking
+          continue;
         }
         
-        allAccounts = [...allAccounts, ...elements];
-        console.log(`Loaded ${allAccounts.length} accounts so far...`);
+        // Reset empty page counter when we get results
+        consecutiveEmptyPages = 0;
         
+        allAccounts = [...allAccounts, ...elements];
+        console.log(`Loaded ${allAccounts.length} accounts total...`);
+        
+        // If we got fewer than pageSize, we're likely near the end
         if (elements.length < pageSize) {
-          console.log('Last page reached');
-          break;
+          console.log(`Got ${elements.length} accounts (less than ${pageSize}), checking a few more pages...`);
         }
         
         start += pageSize;
       }
 
-      console.log(`Total accounts loaded: ${allAccounts.length}`);
+      console.log(`✅ FINAL: Loaded ${allAccounts.length} accounts total`);
 
-      return NextResponse.json(allAccounts.map(acc => ({
+      // Remove duplicates by ID (just in case)
+      const uniqueAccounts = Array.from(
+        new Map(allAccounts.map(acc => [acc.id, acc])).values()
+      );
+
+      console.log(`After deduplication: ${uniqueAccounts.length} unique accounts`);
+
+      return NextResponse.json(uniqueAccounts.map(acc => ({
         clientId: acc.id,
         clientName: acc.name || `Account ${acc.id}`,
       })));

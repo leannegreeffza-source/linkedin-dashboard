@@ -20,51 +20,40 @@ export async function GET(request) {
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
-    // MODE: accounts - fetch ALL accounts (we'll add spend filtering later)
     if (mode === 'accounts') {
-      console.log('Fetching all accounts...');
-
       let allAccounts = [];
       let start = 0;
       const pageSize = 100;
 
-      while (start < 10000) {
-        const accountsResponse = await fetch(
+      while (start < 5000) {
+        const res = await fetch(
           `https://api.linkedin.com/rest/adAccounts?q=search&pageSize=${pageSize}&start=${start}`,
           { headers }
         );
 
-        if (!accountsResponse.ok) {
-          console.error('Account fetch failed:', await accountsResponse.text());
-          break;
-        }
+        if (!res.ok) break;
 
-        const accountsData = await accountsResponse.json();
-        const elements = accountsData.elements || [];
+        const data = await res.json();
+        const elements = data.elements || [];
         
         if (elements.length === 0) break;
         
         allAccounts = [...allAccounts, ...elements];
-        console.log(`Loaded ${allAccounts.length} accounts so far...`);
         
         if (elements.length < pageSize) break;
         start += pageSize;
       }
 
-      console.log(`Total accounts loaded: ${allAccounts.length}`);
-
-      const accountList = allAccounts.map(account => ({
-        clientId: account.id,
-        clientName: account.name || `Account ${account.id}`,
-      }));
-
-      return NextResponse.json(accountList);
+      return NextResponse.json(allAccounts.map(acc => ({
+        clientId: acc.id,
+        clientName: acc.name || `Account ${acc.id}`,
+      })));
     }
 
     return NextResponse.json({ error: 'Invalid mode' }, { status: 400 });
 
   } catch (error) {
-    console.error('Server error:', error);
+    console.error('Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -21,11 +21,11 @@ export async function GET(request) {
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
-    // Fetch accounts - simple pagination
     let accounts = [];
     let start = 0;
 
-    while (start < 1000) {
+    // Load up to 3000 accounts (good balance of speed vs coverage)
+    while (start < 3000) {
       const response = await fetch(
         `https://api.linkedin.com/rest/adAccounts?q=search&start=${start}&count=100`,
         { headers }
@@ -42,12 +42,13 @@ export async function GET(request) {
       if (elements.length === 0) break;
       
       accounts.push(...elements);
+      console.log(`Loaded ${accounts.length} accounts...`);
       
       if (elements.length < 100) break;
       start += 100;
     }
 
-    console.log(`Loaded ${accounts.length} accounts`);
+    console.log(`✅ Total: ${accounts.length} accounts`);
 
     return NextResponse.json(
       accounts.map(acc => ({

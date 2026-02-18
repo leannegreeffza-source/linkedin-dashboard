@@ -16,14 +16,14 @@ export async function GET(request) {
 
     const headers = {
       'Authorization': `Bearer ${token.accessToken}`,
-      'Linkedin-Version': '202504',
+      'linkedin-version': '202504',
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
     if (mode === 'accounts') {
       let allAccounts = [];
       let start = 0;
-      const pageSize = 100;
+      const pageSize = 500;
 
       while (start < 5000) {
         const res = await fetch(

@@ -2,6 +2,7 @@ import { getToken } from 'next-auth/jwt';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function GET(request) {
   try {
@@ -17,11 +18,10 @@ export async function GET(request) {
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
-    // Fetch all ad accounts
     let accounts = [];
     let start = 0;
 
-    while (start < 3000) {
+    while (start < 20000) {
       const res = await fetch(
         `https://api.linkedin.com/rest/adAccounts?q=search&start=${start}&count=100`,
         { headers }
@@ -35,6 +35,7 @@ export async function GET(request) {
       if (elements.length === 0) break;
       
       accounts.push(...elements);
+      
       if (elements.length < 100) break;
       start += 100;
     }
@@ -43,12 +44,10 @@ export async function GET(request) {
       accounts.map(acc => ({
         id: acc.id,
         name: acc.name || `Account ${acc.id}`,
-        status: acc.status || 'ACTIVE'
       }))
     );
 
   } catch (error) {
-    console.error('Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Search, Download, RefreshCw, Calendar, TrendingUp, Eye, MousePointer, DollarSign, Target, Activity } from 'lucide-react';
+import { Search, Download, RefreshCw, Calendar, TrendingUp, Eye, MousePointer, DollarSign, Target, Activity, CheckSquare, Square } from 'lucide-react';
 
 const PRESETS = [
   { label: 'This Month', getValue: () => { const n = new Date(); return { start: `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`, end: n.toISOString().split('T')[0] }; }},
@@ -15,11 +15,9 @@ const PRESETS = [
 export default function Dashboard() {
   const { data: session, status } = useSession();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [selectedAccounts, setSelectedAccounts] = useState([]);
   const [allAccounts, setAllAccounts] = useState([]);
-  const [campaignData, setCampaignData] = useState(null);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
-  const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
@@ -28,7 +26,6 @@ export default function Dashboard() {
   const [endDate, setEndDate] = useState(defaultDates.end);
   const [activePreset, setActivePreset] = useState('This Month');
 
-  // Load account list
   const fetchAccounts = useCallback(async () => {
     if (!session?.accessToken) return;
     setIsLoadingAccounts(true);
@@ -36,40 +33,19 @@ export default function Dashboard() {
       const res = await fetch('/api/linkedin?mode=accounts');
       if (res.ok) {
         const accounts = await res.json();
+        console.log(`Loaded ${accounts.length} accounts`);
         setAllAccounts(accounts);
       }
     } catch (err) {
       console.error('Error loading accounts:', err);
     }
     setIsLoadingAccounts(false);
-  }, [session]);
-
-  // Load campaign data for selected account
-  const fetchCampaignData = useCallback(async (accountId) => {
-    if (!session?.accessToken || !accountId) return;
-    setIsLoadingCampaigns(true);
-    try {
-      const res = await fetch(`/api/linkedin/report?accountId=${accountId}&startDate=${startDate}&endDate=${endDate}`);
-      if (res.ok) {
-        const data = await res.json();
-        setCampaignData(data);
-      }
-    } catch (err) {
-      console.error('Error loading campaign data:', err);
-    }
-    setIsLoadingCampaigns(false);
     setLastUpdated(new Date());
-  }, [session, startDate, endDate]);
+  }, [session]);
 
   useEffect(() => {
     if (session?.accessToken) fetchAccounts();
   }, [session, fetchAccounts]);
-
-  useEffect(() => {
-    if (selectedAccount) {
-      fetchCampaignData(selectedAccount.clientId);
-    }
-  }, [selectedAccount, startDate, endDate]);
 
   const handleDatePreset = (preset) => {
     const dates = preset.getValue();
@@ -88,11 +64,28 @@ export default function Dashboard() {
     !searchTerm || acc.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const MetricCard = ({ label, value, icon: Icon, color = 'blue' }) => (
+  const handleAccountToggle = (accountId) => {
+    setSelectedAccounts(prev =>
+      prev.includes(accountId) ? prev.filter(id => id !== accountId) : [...prev, accountId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedAccounts.length === filteredAccounts.length && filteredAccounts.length > 0) {
+      setSelectedAccounts([]);
+    } else {
+      setSelectedAccounts(filteredAccounts.map(a => a.clientId));
+    }
+  };
+
+  const allSelected = filteredAccounts.length > 0 && selectedAccounts.length === filteredAccounts.length;
+  const someSelected = selectedAccounts.length > 0 && selectedAccounts.length < filteredAccounts.length;
+
+  const MetricCard = ({ label, value, icon: Icon }) => (
     <div className="bg-white rounded-xl p-6 border-2 border-gray-100 hover:border-blue-200 transition-all">
       <div className="flex items-start justify-between mb-3">
         <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">{label}</span>
-        <Icon className={`w-5 h-5 text-${color}-500`} />
+        <Icon className="w-5 h-5 text-blue-500" />
       </div>
       <div className="text-3xl font-bold text-gray-900">{value}</div>
     </div>
@@ -117,9 +110,9 @@ export default function Dashboard() {
             <Target className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-3">LinkedIn Campaign Reports</h1>
-          <p className="text-gray-600 mb-8">Professional reporting dashboard for your LinkedIn campaigns</p>
+          <p className="text-gray-600 mb-8">Professional reporting dashboard</p>
           <button onClick={() => signIn('linkedin')} 
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700">
             Sign in with LinkedIn
           </button>
         </div>
@@ -139,13 +132,13 @@ export default function Dashboard() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Campaign Reports</h1>
-                <p className="text-sm text-gray-500">{allAccounts.length} accounts • Updated {lastUpdated.toLocaleTimeString()}</p>
+                <p className="text-sm text-gray-500">{allAccounts.length} accounts loaded • Updated {lastUpdated.toLocaleTimeString()}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative">
                 <button onClick={() => setShowDatePicker(!showDatePicker)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
                   <Calendar className="w-4 h-4 text-gray-600" />
                   <span className="text-sm font-medium text-gray-700">{activePreset}</span>
                 </button>
@@ -155,7 +148,7 @@ export default function Dashboard() {
                     <div className="grid grid-cols-3 gap-2 mb-4">
                       {PRESETS.map(p => (
                         <button key={p.label} onClick={() => handleDatePreset(p)}
-                          className={`px-3 py-2 text-xs rounded-lg font-medium transition-colors ${activePreset === p.label ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                          className={`px-3 py-2 text-xs rounded-lg font-medium ${activePreset === p.label ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                           {p.label}
                         </button>
                       ))}
@@ -177,7 +170,7 @@ export default function Dashboard() {
                 )}
               </div>
               <button onClick={() => signOut()} 
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
                 Sign Out
               </button>
             </div>
@@ -187,83 +180,98 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-12 gap-6">
-          {/* Sidebar - Client List */}
+          {/* Sidebar */}
           <div className="col-span-4">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Select Account</h2>
-              <div className="relative mb-4">
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sticky top-24" style={{ maxHeight: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-900">Select Accounts</h2>
+                <span className="text-sm text-gray-500">({allAccounts.length} total)</span>
+              </div>
+              
+              <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input type="text" placeholder="Search accounts..." value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
               </div>
+
               {searchTerm && (
-                <p className="text-xs text-gray-500 mb-2">Found {filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-gray-600 mb-2 px-1">
+                  Found {filteredAccounts.length} of {allAccounts.length} accounts
+                </p>
               )}
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+
+              <button onClick={handleSelectAll}
+                className="w-full flex items-center gap-2 px-4 py-3 mb-3 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-sm font-medium text-gray-700">
+                {allSelected ? <CheckSquare className="w-5 h-5 text-blue-600" /> : someSelected ? <CheckSquare className="w-5 h-5 text-blue-400" /> : <Square className="w-5 h-5 text-gray-400" />}
+                <span>
+                  {allSelected ? `Deselect All (${filteredAccounts.length})` : `Select All (${filteredAccounts.length})`}
+                </span>
+              </button>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2" style={{ maxHeight: 'calc(100vh - 400px)' }}>
                 {filteredAccounts.map(account => (
-                  <button key={account.clientId}
-                    onClick={() => setSelectedAccount(account)}
-                    className={`w-full text-left p-4 rounded-lg transition-all ${selectedAccount?.clientId === account.clientId ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-50 text-gray-900 hover:bg-gray-100'}`}>
-                    <div className="font-semibold">{account.clientName}</div>
-                    <div className={`text-xs ${selectedAccount?.clientId === account.clientId ? 'text-blue-100' : 'text-gray-500'}`}>
-                      ID: {account.clientId}
+                  <label key={account.clientId}
+                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border-2 transition-all ${selectedAccounts.includes(account.clientId) ? 'bg-blue-50 border-blue-400' : 'bg-gray-50 border-transparent hover:border-gray-300'}`}>
+                    <input type="checkbox" checked={selectedAccounts.includes(account.clientId)}
+                      onChange={() => handleAccountToggle(account.clientId)}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm truncate">{account.clientName}</div>
+                      <div className="text-xs text-gray-500">ID: {account.clientId}</div>
                     </div>
-                  </button>
+                  </label>
                 ))}
               </div>
+
+              {selectedAccounts.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <button onClick={() => setSelectedAccounts([])} 
+                    className="w-full py-2 text-sm text-red-600 hover:text-red-800 font-medium">
+                    Clear Selection ({selectedAccounts.length})
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Main Report Area */}
+          {/* Main Area */}
           <div className="col-span-8">
-            {!selectedAccount ? (
+            {selectedAccounts.length === 0 ? (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center">
                 <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Select an Account</h3>
-                <p className="text-gray-600">Choose an account from the sidebar to view its campaign performance report</p>
-              </div>
-            ) : isLoadingCampaigns ? (
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center">
-                <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-lg font-semibold text-gray-800">Loading Campaign Data...</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Select Accounts to View Reports</h3>
+                <p className="text-gray-600 mb-4">Use the search box and checkboxes on the left to select one or more accounts</p>
+                <div className="inline-block bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                  <p className="text-sm text-green-700 font-medium">
+                    ✅ {allAccounts.length} accounts ready
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Report Header */}
                 <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-1">{selectedAccount.clientName}</h2>
-                      <p className="text-sm text-gray-500">Report for {startDate} - {endDate}</p>
-                      <p className="text-xs text-gray-400 mt-1">Account ID: {selectedAccount.clientId}</p>
-                    </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                      <Download className="w-4 h-4" />
-                      <span className="text-sm font-medium">Export PDF</span>
-                    </button>
-                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''} Selected
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    Report period: {startDate} to {endDate}
+                  </p>
                 </div>
 
-                {/* Campaign Performance Metrics */}
                 <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6">Campaign Performance</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-6">Aggregate Performance</h3>
                   <div className="grid grid-cols-3 gap-4">
-                    <MetricCard label="Impressions" value="Loading..." icon={Eye} />
-                    <MetricCard label="Clicks" value="Loading..." icon={MousePointer} />
-                    <MetricCard label="CTR" value="Loading..." icon={TrendingUp} />
-                    <MetricCard label="Spend" value="Loading..." icon={DollarSign} />
-                    <MetricCard label="CPC" value="Loading..." icon={DollarSign} />
+                    <MetricCard label="Total Impressions" value="Loading..." icon={Eye} />
+                    <MetricCard label="Total Clicks" value="Loading..." icon={MousePointer} />
+                    <MetricCard label="Avg CTR" value="Loading..." icon={TrendingUp} />
+                    <MetricCard label="Total Spend" value="Loading..." icon={DollarSign} />
+                    <MetricCard label="Avg CPC" value="Loading..." icon={DollarSign} />
                     <MetricCard label="Conversions" value="Loading..." icon={Target} />
                   </div>
-                </div>
-
-                {/* Top Performing Ads */}
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Top Performing Ads</h3>
-                  <div className="text-sm text-gray-500 text-center py-8">
-                    Campaign data will load here from LinkedIn API
-                  </div>
+                  <p className="text-sm text-gray-500 mt-4 text-center">
+                    Campaign data loading will be implemented in next update
+                  </p>
                 </div>
               </div>
             )}

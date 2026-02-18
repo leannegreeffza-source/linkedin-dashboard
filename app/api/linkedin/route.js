@@ -24,17 +24,14 @@ export async function GET(request) {
     let accounts = [];
     let start = 0;
 
-    // Load up to 3000 accounts (good balance of speed vs coverage)
+    // Load 3000 accounts
     while (start < 3000) {
       const response = await fetch(
         `https://api.linkedin.com/rest/adAccounts?q=search&start=${start}&count=100`,
         { headers }
       );
 
-      if (!response.ok) {
-        console.error('API Error:', response.status);
-        break;
-      }
+      if (!response.ok) break;
 
       const data = await response.json();
       const elements = data.elements || [];
@@ -50,10 +47,11 @@ export async function GET(request) {
 
     console.log(`✅ Total: ${accounts.length} accounts`);
 
+    // CRITICAL: Return with matching field names
     return NextResponse.json(
       accounts.map(acc => ({
-        id: acc.id,
-        name: acc.name || `Account ${acc.id}`,
+        clientId: acc.id,           // Map id -> clientId
+        clientName: acc.name || `Account ${acc.id}`,  // Map name -> clientName
       }))
     );
 

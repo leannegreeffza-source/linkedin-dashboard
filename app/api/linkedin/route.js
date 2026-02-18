@@ -28,7 +28,7 @@ export async function GET(request) {
     let start = 0;
     const pageSize = 100;
 
-    while (start < 10000) { // Safety limit
+    while (start < 5000) { // Safety limit
       const accountsResponse = await fetch(
         `https://api.linkedin.com/rest/adAccounts?q=search&pageSize=${pageSize}&start=${start}`,
         { headers }

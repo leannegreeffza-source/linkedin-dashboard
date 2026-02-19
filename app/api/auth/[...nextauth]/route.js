@@ -1,15 +1,13 @@
-import NextAuth from 'next-auth';
-import LinkedInProvider from 'next-auth/providers/linkedin';
+import NextAuth from "next-auth";
+import LinkedInProvider from "next-auth/providers/linkedin";
 
-const handler = NextAuth({
+export const authOptions = {
   providers: [
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
       authorization: {
-        params: {
-          scope: 'r_liteprofile r_emailaddress r_ads r_ads_reporting',
-        },
+        params: { scope: "openid profile email r_ads r_ads_reporting" },
       },
     }),
   ],
@@ -25,7 +23,7 @@ const handler = NextAuth({
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
-});
+};
 
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };

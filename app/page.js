@@ -1,58 +1,202 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Search, Calendar, TrendingUp, TrendingDown, DollarSign, MousePointer, Eye, Target, Users, RefreshCw } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, DollarSign, MousePointer, Eye, Target, Users, RefreshCw, ChevronDown, Calendar } from 'lucide-react';
+
+// ========== DATE PICKER ==========
+
+function DateRangePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [tempStart, setTempStart] = useState(value.start);
+  const [tempEnd, setTempEnd] = useState(value.end);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const presets = [
+    { label: 'Today', fn: () => { const d = today(); return { start: d, end: d }; } },
+    { label: 'Yesterday', fn: () => { const d = daysAgo(1); return { start: d, end: d }; } },
+    { label: 'Last 7 days', fn: () => ({ start: daysAgo(6), end: today() }) },
+    { label: 'Last 30 days', fn: () => ({ start: daysAgo(29), end: today() }) },
+    { label: 'Last 90 days', fn: () => ({ start: daysAgo(89), end: today() }) },
+    { label: 'This month', fn: () => ({ start: firstOfMonth(), end: today() }) },
+    { label: 'Last month', fn: () => lastMonth() },
+    { label: 'This quarter', fn: () => thisQuarter() },
+    { label: 'Last quarter', fn: () => lastQuarter() },
+    { label: 'All time', fn: () => ({ start: '2020-01-01', end: today() }) },
+  ];
+
+  function today() { return new Date().toISOString().split('T')[0]; }
+  function daysAgo(n) { return new Date(Date.now() - n * 86400000).toISOString().split('T')[0]; }
+  function firstOfMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; }
+  function lastMonth() {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-1);
+    const start = d.toISOString().split('T')[0];
+    const last = new Date(d.getFullYear(), d.getMonth()+1, 0);
+    return { start, end: last.toISOString().split('T')[0] };
+  }
+  function thisQuarter() {
+    const d = new Date(); const q = Math.floor(d.getMonth()/3);
+    const start = new Date(d.getFullYear(), q*3, 1).toISOString().split('T')[0];
+    return { start, end: today() };
+  }
+  function lastQuarter() {
+    const d = new Date(); const q = Math.floor(d.getMonth()/3);
+    const sq = q === 0 ? 3 : q-1; const yr = q === 0 ? d.getFullYear()-1 : d.getFullYear();
+    const start = new Date(yr, sq*3, 1).toISOString().split('T')[0];
+    const end = new Date(yr, sq*3+3, 0).toISOString().split('T')[0];
+    return { start, end };
+  }
+
+  function applyPreset(fn) {
+    const range = fn();
+    setTempStart(range.start); setTempEnd(range.end);
+    onChange(range); setOpen(false);
+  }
+
+  function applyCustom() {
+    onChange({ start: tempStart, end: tempEnd });
+    setOpen(false);
+  }
+
+  function formatDisplay(start, end) {
+    const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `${fmt(start)} – ${fmt(end)}`;
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
+      >
+        <Calendar className="w-4 h-4 text-gray-500" />
+        {formatDisplay(value.start, value.end)}
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-2 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-2xl flex" style={{minWidth: 560}}>
+          {/* Presets */}
+          <div className="w-40 border-r border-gray-100 py-2">
+            {presets.map(p => (
+              <button key={p.label} onClick={() => applyPreset(p.fn)}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                {p.label}
+              </button>
+            ))}
+            <button onClick={() => {}}
+              className="w-full text-left px-4 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50">
+              Custom
+            </button>
+          </div>
+
+          {/* Custom date inputs */}
+          <div className="p-4 flex-1">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Start date</label>
+                <input type="date" value={tempStart}
+                  onChange={e => setTempStart(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">End date</label>
+                <input type="date" value={tempEnd}
+                  onChange={e => setTempEnd(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setOpen(false)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={applyCustom}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium">
+                Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ========== MAIN DASHBOARD ==========
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
-  
-  // State
+
   const [accounts, setAccounts] = useState([]);
   const [selectedAccounts, setSelectedAccounts] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [accountSearch, setAccountSearch] = useState('');
+
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedCampaigns, setSelectedCampaigns] = useState([]);
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
-  const [exchangeRate, setExchangeRate] = useState(18.5); // ZAR to USD default
-  
-  // Date ranges
+  const [exchangeRate, setExchangeRate] = useState(18.5);
+  const [manualBudget, setManualBudget] = useState('');
+
   const [currentRange, setCurrentRange] = useState({
-    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    start: new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
-  
   const [previousRange, setPreviousRange] = useState({
-    start: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    start: new Date(Date.now() - 13 * 86400000).toISOString().split('T')[0],
+    end: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
   });
 
-  // Load accounts on mount
-  useEffect(() => {
-    if (session) loadAccounts();
-  }, [session]);
+  useEffect(() => { if (session) loadAccounts(); }, [session]);
 
-  // Load data when selection changes
   useEffect(() => {
     if (selectedAccounts.length > 0) {
-      loadCampaignData();
+      loadCampaigns();
+      setSelectedCampaigns([]);
+    } else {
+      setCampaigns([]);
+      setSelectedCampaigns([]);
+      setReportData(null);
     }
-  }, [selectedAccounts, currentRange, previousRange]);
+  }, [selectedAccounts]);
+
+  useEffect(() => {
+    if (selectedAccounts.length > 0) loadAnalytics();
+  }, [selectedCampaigns, currentRange, previousRange]);
 
   async function loadAccounts() {
-    setLoading(true);
     try {
       const res = await fetch('/api/accounts');
-      if (res.ok) {
-        const data = await res.json();
-        setAccounts(data);
-      }
-    } catch (err) {
-      console.error('Error loading accounts:', err);
-    }
-    setLoading(false);
+      if (res.ok) setAccounts(await res.json());
+    } catch (err) { console.error(err); }
   }
 
-  async function loadCampaignData() {
+  async function loadCampaigns() {
+    setLoadingCampaigns(true);
+    try {
+      const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountIds: selectedAccounts })
+      });
+      if (res.ok) setCampaigns(await res.json());
+    } catch (err) { console.error(err); }
+    setLoadingCampaigns(false);
+  }
+
+  async function loadAnalytics() {
     setLoading(true);
     try {
       const res = await fetch('/api/analytics', {
@@ -60,103 +204,246 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accountIds: selectedAccounts,
+          campaignIds: selectedCampaigns.length > 0 ? selectedCampaigns : null,
           currentRange,
           previousRange,
           exchangeRate
         })
       });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setReportData(data);
-      }
-    } catch (err) {
-      console.error('Error loading campaign data:', err);
-    }
+      if (res.ok) setReportData(await res.json());
+    } catch (err) { console.error(err); }
     setLoading(false);
   }
 
-  const filtered = accounts.filter(a => 
-    !searchTerm || a.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAccounts = accounts.filter(a =>
+    !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase())
+  );
+
+  const filteredCampaigns = campaigns.filter(c =>
+    !campaignSearch || c.name.toLowerCase().includes(campaignSearch.toLowerCase())
   );
 
   function toggleAccount(id) {
-    setSelectedAccounts(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setSelectedAccounts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
-  function selectAll() {
-    setSelectedAccounts(filtered.map(a => a.id));
+  function toggleCampaign(id) {
+    setSelectedCampaigns(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
-  function clearSelection() {
-    setSelectedAccounts([]);
-    setReportData(null);
-  }
-
-  if (status === 'loading') {
-    return <LoadingScreen />;
-  }
-
-  if (!session) {
-    return <SignInScreen />;
-  }
+  if (status === 'loading') return <LoadingScreen />;
+  if (!session) return <SignInScreen />;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-900">
       {/* Header */}
-      <Header 
-        accountCount={accounts.length}
-        selectedCount={selectedAccounts.length}
-        onSignOut={() => signOut()}
-      />
+      <div className="bg-slate-800 border-b border-slate-700 shadow-lg">
+        <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-white">LinkedIn Campaign Manager</h1>
+            <p className="text-sm text-slate-400">{accounts.length} accounts • {selectedAccounts.length} selected</p>
+          </div>
+          <button onClick={() => signOut()}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm">
+            Sign Out
+          </button>
+        </div>
+      </div>
 
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-screen-2xl mx-auto p-6">
         <div className="grid grid-cols-12 gap-6">
-          {/* Sidebar - Account Selection */}
-          <div className="col-span-3">
-            <AccountSelector
-              accounts={filtered}
-              selectedAccounts={selectedAccounts}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onToggle={toggleAccount}
-              onSelectAll={selectAll}
-              onClear={clearSelection}
-            />
+
+          {/* Sidebar */}
+          <div className="col-span-3 space-y-4">
+
+            {/* Account Selector */}
+            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+              <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">Accounts</h2>
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input type="text" placeholder="Search accounts..."
+                  value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
+              </div>
+              <div className="flex gap-2 mb-3">
+                <button onClick={() => setSelectedAccounts(filteredAccounts.map(a => a.id))}
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+                  All
+                </button>
+                {selectedAccounts.length > 0 && (
+                  <button onClick={() => setSelectedAccounts([])}
+                    className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
+                    Clear ({selectedAccounts.length})
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {filteredAccounts.map(acc => (
+                  <label key={acc.id}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
+                      selectedAccounts.includes(acc.id)
+                        ? 'bg-blue-900 border-blue-500 text-white'
+                        : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                    }`}>
+                    <input type="checkbox" checked={selectedAccounts.includes(acc.id)}
+                      onChange={() => toggleAccount(acc.id)} className="w-4 h-4 accent-blue-500" />
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{acc.name}</div>
+                      <div className="text-xs text-slate-400">ID: {acc.id}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Campaign Selector */}
+            {selectedAccounts.length > 0 && (
+              <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">
+                  Campaigns {loadingCampaigns && <span className="text-slate-400 font-normal text-xs">(loading...)</span>}
+                </h2>
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <input type="text" placeholder="Search campaigns..."
+                    value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div className="flex gap-2 mb-3">
+                  <button onClick={() => setSelectedCampaigns(filteredCampaigns.map(c => c.id))}
+                    className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+                    All
+                  </button>
+                  {selectedCampaigns.length > 0 && (
+                    <button onClick={() => setSelectedCampaigns([])}
+                      className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
+                      Clear ({selectedCampaigns.length})
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1 max-h-64 overflow-y-auto">
+                  {filteredCampaigns.map(c => (
+                    <label key={c.id}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
+                        selectedCampaigns.includes(c.id)
+                          ? 'bg-blue-900 border-blue-500 text-white'
+                          : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                      }`}>
+                      <input type="checkbox" checked={selectedCampaigns.includes(c.id)}
+                        onChange={() => toggleCampaign(c.id)} className="w-4 h-4 accent-blue-500" />
+                      <div className="min-w-0">
+                        <div className="font-medium truncate text-xs">{c.name}</div>
+                        <div className="text-xs text-slate-400">ID: {c.id}</div>
+                      </div>
+                    </label>
+                  ))}
+                  {filteredCampaigns.length === 0 && !loadingCampaigns && (
+                    <p className="text-slate-400 text-xs text-center py-4">No campaigns found</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Main Content */}
           <div className="col-span-9">
             {!reportData ? (
-              <EmptyState accountCount={accounts.length} />
+              <div className="bg-slate-800 rounded-xl p-12 text-center border border-slate-700">
+                <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-white mb-2">Select Accounts to View Report</h2>
+                <p className="text-slate-400">Choose one or more accounts from the sidebar</p>
+              </div>
             ) : (
               <>
-                {/* Date Range & Exchange Rate */}
-                <DateRangeCard
-                  currentRange={currentRange}
-                  previousRange={previousRange}
-                  exchangeRate={exchangeRate}
-                  onCurrentRangeChange={setCurrentRange}
-                  onPreviousRangeChange={setPreviousRange}
-                  onExchangeRateChange={setExchangeRate}
-                  loading={loading}
-                  onRefresh={loadCampaignData}
-                />
+                {/* Controls Bar */}
+                <div className="bg-slate-800 rounded-xl p-4 mb-6 border border-slate-700">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Current Period</p>
+                      <DateRangePicker value={currentRange} onChange={setCurrentRange} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Compare Period</p>
+                      <DateRangePicker value={previousRange} onChange={setPreviousRange} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">ZAR → USD Rate</p>
+                      <input type="number" step="0.01" value={exchangeRate}
+                        onChange={e => setExchangeRate(parseFloat(e.target.value))}
+                        className="w-24 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm shadow-sm" />
+                    </div>
+                    <div className="ml-auto">
+                      <button onClick={loadAnalytics} disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm">
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-                {/* Campaign Performance Metrics */}
-                <MetricsGrid 
-                  current={reportData.current}
-                  previous={reportData.previous}
-                  exchangeRate={exchangeRate}
-                />
+                {/* Metrics Grid */}
+                <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
+                  <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
+                  <div className="grid grid-cols-4 gap-4">
+                    {[
+                      { label: 'Impressions', key: 'impressions', format: 'number', icon: Eye },
+                      { label: 'Clicks', key: 'clicks', format: 'number', icon: MousePointer },
+                      { label: 'CTR', key: 'ctr', format: 'percent', icon: TrendingUp },
+                      { label: 'Spent', key: 'spent', format: 'currency', icon: DollarSign },
+                      { label: 'CPM', key: 'cpm', format: 'currency', icon: DollarSign },
+                      { label: 'CPC', key: 'cpc', format: 'currency', icon: DollarSign },
+                      { label: 'Website Visits', key: 'websiteVisits', format: 'number', icon: Target },
+                      { label: 'Leads', key: 'leads', format: 'number', icon: Users },
+                      { label: 'CPL', key: 'cpl', format: 'currency', icon: DollarSign },
+                      { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp },
+                      { label: 'Engagements', key: 'engagements', format: 'number', icon: Users },
+                    ].map(metric => (
+                      <MetricCard key={metric.key}
+                        label={metric.label}
+                        current={reportData.current[metric.key]}
+                        previous={reportData.previous[metric.key]}
+                        format={metric.format}
+                        icon={metric.icon}
+                        exchangeRate={exchangeRate} />
+                    ))}
+                  </div>
+                </div>
 
-                {/* Top Performing Ads */}
-                <TopAdsTable ads={reportData.topAds} />
+                {/* Top Ads */}
+                {reportData.topAds?.length > 0 && (
+                  <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
+                    <h3 className="text-lg font-bold text-white mb-4">Top Performing Campaigns</h3>
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-slate-700">
+                          <th className="pb-3 text-left text-xs font-bold text-slate-400 uppercase">ID</th>
+                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Impressions</th>
+                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Clicks</th>
+                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">CTR</th>
+                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Spent</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700">
+                        {reportData.topAds.map(ad => (
+                          <tr key={ad.id} className="hover:bg-slate-700/50">
+                            <td className="py-3 text-sm font-semibold text-white">{ad.id}</td>
+                            <td className="py-3 text-sm text-right text-slate-300">{ad.impressions.toLocaleString()}</td>
+                            <td className="py-3 text-sm text-right text-slate-300">{ad.clicks.toLocaleString()}</td>
+                            <td className="py-3 text-sm text-right text-slate-300">{ad.ctr}%</td>
+                            <td className="py-3 text-sm text-right text-slate-300">R {ad.spent.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {/* Budget Pacing */}
-                <BudgetPacing pacing={reportData.budgetPacing} />
+                <BudgetPacingCard
+                  pacing={reportData.budgetPacing}
+                  manualBudget={manualBudget}
+                  onBudgetChange={setManualBudget}
+                />
               </>
             )}
           </div>
@@ -166,161 +453,10 @@ export default function Dashboard() {
   );
 }
 
-// ========== COMPONENTS ==========
-
-function Header({ accountCount, selectedCount, onSignOut }) {
-  return (
-    <div className="bg-white border-b shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">LinkedIn Campaign Manager</h1>
-          <p className="text-sm text-gray-600">{accountCount} accounts • {selectedCount} selected</p>
-        </div>
-        <button onClick={onSignOut} 
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
-          Sign Out
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function AccountSelector({ accounts, selectedAccounts, searchTerm, onSearchChange, onToggle, onSelectAll, onClear }) {
-  return (
-    <div className="bg-white rounded-xl shadow p-6">
-      <h2 className="font-bold text-lg mb-4">Select Accounts</h2>
-      
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search accounts..."
-          value={searchTerm}
-          onChange={e => onSearchChange(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
-        />
-      </div>
-
-      <div className="flex gap-2 mb-4">
-        <button onClick={onSelectAll} 
-          className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100">
-          Select All
-        </button>
-        {selectedAccounts.length > 0 && (
-          <button onClick={onClear}
-            className="flex-1 px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100">
-            Clear ({selectedAccounts.length})
-          </button>
-        )}
-      </div>
-
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {accounts.map(acc => (
-          <label key={acc.id} 
-            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border ${
-              selectedAccounts.includes(acc.id) ? 'bg-blue-50 border-blue-300' : 'border-gray-200 hover:bg-gray-50'
-            }`}>
-            <input
-              type="checkbox"
-              checked={selectedAccounts.includes(acc.id)}
-              onChange={() => onToggle(acc.id)}
-              className="w-4 h-4"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-sm truncate">{acc.name}</div>
-              <div className="text-xs text-gray-500">ID: {acc.id}</div>
-            </div>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DateRangeCard({ currentRange, previousRange, exchangeRate, onCurrentRangeChange, onPreviousRangeChange, onExchangeRateChange, loading, onRefresh }) {
-  return (
-    <div className="bg-white rounded-xl shadow p-6 mb-6">
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Current Period</label>
-          <div className="flex gap-2">
-            <input type="date" value={currentRange.start} 
-              onChange={e => onCurrentRangeChange({...currentRange, start: e.target.value})}
-              className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-            <input type="date" value={currentRange.end}
-              onChange={e => onCurrentRangeChange({...currentRange, end: e.target.value})}
-              className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Previous Period (Compare)</label>
-          <div className="flex gap-2">
-            <input type="date" value={previousRange.start}
-              onChange={e => onPreviousRangeChange({...previousRange, start: e.target.value})}
-              className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-            <input type="date" value={previousRange.end}
-              onChange={e => onPreviousRangeChange({...previousRange, end: e.target.value})}
-              className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Exchange Rate (ZAR to USD)</label>
-          <div className="flex gap-2">
-            <input type="number" step="0.01" value={exchangeRate}
-              onChange={e => onExchangeRateChange(parseFloat(e.target.value))}
-              className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-            <button onClick={onRefresh} disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MetricsGrid({ current, previous, exchangeRate }) {
-  const metrics = [
-    { label: 'Impressions', key: 'impressions', format: 'number', icon: Eye },
-    { label: 'Clicks', key: 'clicks', format: 'number', icon: MousePointer },
-    { label: 'CTR', key: 'ctr', format: 'percent', icon: TrendingUp },
-    { label: 'Spent', key: 'spent', format: 'currency', icon: DollarSign },
-    { label: 'CPM', key: 'cpm', format: 'currency', icon: DollarSign },
-    { label: 'CPC', key: 'cpc', format: 'currency', icon: DollarSign },
-    { label: 'Website Visits', key: 'websiteVisits', format: 'number', icon: Target },
-    { label: 'Leads', key: 'leads', format: 'number', icon: Users },
-    { label: 'CPL', key: 'cpl', format: 'currency', icon: DollarSign },
-    { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp },
-    { label: 'Engagements', key: 'engagements', format: 'number', icon: Users },
-  ];
-
-  return (
-    <div className="bg-white rounded-xl shadow p-6 mb-6">
-      <h3 className="text-lg font-bold mb-6">Campaign Performance</h3>
-      <div className="grid grid-cols-4 gap-4">
-        {metrics.map(metric => (
-          <MetricCard
-            key={metric.key}
-            label={metric.label}
-            current={current[metric.key]}
-            previous={previous[metric.key]}
-            format={metric.format}
-            icon={metric.icon}
-            exchangeRate={exchangeRate}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function MetricCard({ label, current, previous, format, icon: Icon, exchangeRate }) {
   const change = previous > 0 ? ((current - previous) / previous * 100) : 0;
   const isPositive = change >= 0;
-  
+
   function formatValue(val) {
     if (format === 'currency') return `$${(val / exchangeRate).toFixed(2)}`;
     if (format === 'percent') return `${val.toFixed(2)}%`;
@@ -328,15 +464,13 @@ function MetricCard({ label, current, previous, format, icon: Icon, exchangeRate
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4 border">
+    <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-gray-600 uppercase">{label}</span>
-        <Icon className="w-4 h-4 text-gray-400" />
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{label}</span>
+        <Icon className="w-4 h-4 text-slate-500" />
       </div>
-      <div className="text-2xl font-bold text-gray-900 mb-1">
-        {formatValue(current)}
-      </div>
-      <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+      <div className="text-2xl font-bold text-white mb-1">{formatValue(current)}</div>
+      <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
         {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
         {Math.abs(change).toFixed(1)}% vs previous
       </div>
@@ -344,114 +478,71 @@ function MetricCard({ label, current, previous, format, icon: Icon, exchangeRate
   );
 }
 
-function TopAdsTable({ ads }) {
-  if (!ads || ads.length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-xl shadow p-6 mb-6">
-      <h3 className="text-lg font-bold mb-4">Top Performing Ads</h3>
-      <table className="w-full">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Creative ID</th>
-            <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase">Impressions</th>
-            <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase">Clicks</th>
-            <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase">CTR</th>
-            <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase">Spent</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {ads.map(ad => (
-            <tr key={ad.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-sm font-semibold">{ad.id}</td>
-              <td className="px-4 py-3 text-sm text-right">{ad.impressions.toLocaleString()}</td>
-              <td className="px-4 py-3 text-sm text-right">{ad.clicks.toLocaleString()}</td>
-              <td className="px-4 py-3 text-sm text-right">{ad.ctr}%</td>
-              <td className="px-4 py-3 text-sm text-right">R {ad.spent.toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function BudgetPacing({ pacing }) {
+function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
   if (!pacing) return null;
 
-  const pacingPercent = (pacing.spent / pacing.budget * 100).toFixed(1);
-  const daysElapsed = pacing.daysElapsed;
-  const daysTotal = pacing.daysTotal;
-  const dayProgress = (daysElapsed / daysTotal * 100).toFixed(1);
+  const budget = parseFloat(manualBudget) || pacing.budget || 0;
+  const pacingPercent = budget > 0 ? Math.min((pacing.spent / budget * 100), 100).toFixed(1) : 0;
+  const dayProgress = pacing.daysTotal > 0 ? (pacing.daysElapsed / pacing.daysTotal * 100).toFixed(1) : 0;
 
   return (
-    <div className="bg-white rounded-xl shadow p-6">
-      <h3 className="text-lg font-bold mb-6">Budgeting and Pacing</h3>
-      <div className="grid grid-cols-3 gap-6">
+    <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+      <h3 className="text-lg font-bold text-white mb-6">Budgeting and Pacing</h3>
+      <div className="grid grid-cols-3 gap-6 mb-6">
         <div>
-          <label className="text-sm font-medium text-gray-600">Budget</label>
-          <div className="text-2xl font-bold text-gray-900">R {pacing.budget.toLocaleString()}</div>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-600">Spent</label>
-          <div className="text-2xl font-bold text-gray-900">R {pacing.spent.toLocaleString()}</div>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-600">Pacing</label>
-          <div className="text-2xl font-bold text-gray-900">{pacingPercent}%</div>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="font-medium">Budget Progress</span>
-          <span className="text-gray-600">{pacingPercent}%</span>
-        </div>
-        <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-blue-600 transition-all" 
-            style={{ width: `${Math.min(pacingPercent, 100)}%` }}
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget (ZAR)</label>
+          <input
+            type="number"
+            placeholder="Enter budget..."
+            value={manualBudget}
+            onChange={e => onBudgetChange(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500"
           />
         </div>
-      </div>
-
-      <div className="mt-4">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="font-medium">Time Progress</span>
-          <span className="text-gray-600">{daysElapsed}/{daysTotal} days ({dayProgress}%)</span>
+        <div>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Spent</label>
+          <div className="text-2xl font-bold text-white">R {pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
         </div>
-        <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-gray-600 transition-all" 
-            style={{ width: `${dayProgress}%` }}
-          />
+        <div>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Pacing</label>
+          <div className={`text-2xl font-bold ${parseFloat(pacingPercent) > 90 ? 'text-red-400' : parseFloat(pacingPercent) > 70 ? 'text-yellow-400' : 'text-emerald-400'}`}>
+            {budget > 0 ? `${pacingPercent}%` : '—'}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function EmptyState({ accountCount }) {
-  return (
-    <div className="bg-white rounded-xl shadow p-12 text-center">
-      <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-      <h2 className="text-2xl font-bold mb-2">Select Accounts to View Report</h2>
-      <p className="text-gray-600">Choose one or more accounts from the sidebar</p>
-      {accountCount > 0 && (
-        <div className="mt-4 inline-block bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-          <p className="text-sm text-green-700 font-medium">✅ {accountCount} accounts loaded</p>
+      {budget > 0 && (
+        <div className="mb-4">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="font-medium text-slate-300">Budget Progress</span>
+            <span className="text-slate-400">{pacingPercent}%</span>
+          </div>
+          <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+            <div className={`h-full transition-all rounded-full ${parseFloat(pacingPercent) > 90 ? 'bg-red-500' : parseFloat(pacingPercent) > 70 ? 'bg-yellow-500' : 'bg-blue-500'}`}
+              style={{ width: `${pacingPercent}%` }} />
+          </div>
         </div>
       )}
+
+      <div>
+        <div className="flex justify-between text-sm mb-2">
+          <span className="font-medium text-slate-300">Time Progress</span>
+          <span className="text-slate-400">{pacing.daysElapsed}/{pacing.daysTotal} days ({dayProgress}%)</span>
+        </div>
+        <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+          <div className="h-full bg-slate-500 transition-all rounded-full" style={{ width: `${dayProgress}%` }} />
+        </div>
+      </div>
     </div>
   );
 }
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
       <div className="text-center">
-        <RefreshCw className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
-        <p className="text-xl font-semibold">Loading...</p>
+        <RefreshCw className="w-16 h-16 text-blue-500 animate-spin mx-auto mb-4" />
+        <p className="text-xl font-semibold text-white">Loading...</p>
       </div>
     </div>
   );
@@ -459,11 +550,11 @@ function LoadingScreen() {
 
 function SignInScreen() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md">
-        <h1 className="text-3xl font-bold mb-3">LinkedIn Campaign Manager</h1>
-        <p className="text-gray-600 mb-8">Sign in to view your campaign analytics</p>
-        <button onClick={() => signIn('linkedin')} 
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="bg-slate-800 rounded-2xl shadow-2xl p-12 max-w-md border border-slate-700">
+        <h1 className="text-3xl font-bold mb-3 text-white">LinkedIn Campaign Manager</h1>
+        <p className="text-slate-400 mb-8">Sign in to view your campaign analytics</p>
+        <button onClick={() => signIn('linkedin')}
           className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700">
           Sign in with LinkedIn
         </button>

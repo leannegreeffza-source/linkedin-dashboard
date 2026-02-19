@@ -12,11 +12,9 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { accountIds, currentRange, previousRange, exchangeRate } = await request.json();
+    const { accountIds, currentRange, previousRange } = await request.json();
 
     console.log('Analytics request for accounts:', accountIds);
-    console.log('Current range:', currentRange);
-    console.log('Previous range:', previousRange);
 
     const headers = {
       'Authorization': `Bearer ${token.accessToken}`,
@@ -29,18 +27,12 @@ export async function POST(request) {
 
     const current = calculateMetrics(currentData);
     const previous = calculateMetrics(previousData);
-
     const topAds = getTopAds(currentData.creatives, 5);
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
 
     console.log('Final current metrics:', current);
 
-    return NextResponse.json({
-      current,
-      previous,
-      topAds,
-      budgetPacing
-    });
+    return NextResponse.json({ current, previous, topAds, budgetPacing });
 
   } catch (error) {
     console.error('Analytics error:', error);
@@ -72,10 +64,10 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
     console.log('Fetching campaigns for account:', accountId);
 
     try {
-      campaignUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${encodeURIComponent(accountUrn)}&count=100`;
-      console.log('Campaign URL:', campaignUrl);
+      const fetchUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${encodeURIComponent(accountUrn)}&count=100`;
+      console.log('Campaign URL:', fetchUrl);
 
-      const campaignRes = await fetch(campaignUrl, { headers });
+      const campaignRes = await fetch(fetchUrl, { headers });
       console.log('Campaign response status:', campaignRes.status);
 
       if (!campaignRes.ok) {
@@ -120,9 +112,6 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
 
       const analyticsData = await analyticsRes.json();
       console.log('Analytics elements count:', analyticsData.elements?.length);
-      if (analyticsData.elements?.length > 0) {
-        console.log('First analytics element:', JSON.stringify(analyticsData.elements[0]));
-      }
 
       (analyticsData.elements || []).forEach(el => {
         const creativeUrn = el.pivotValues?.[0];
@@ -204,7 +193,7 @@ function getTopAds(creatives, count) {
 
 function calculateBudgetPacing(data, dateRange) {
   const totalBudget = data.campaigns.reduce((sum, c) => {
-    return sum + (c.totalBudget || c.dailyBudget * 30 || 0);
+    return sum + (parseFloat(c.totalBudget) || parseFloat(c.dailyBudget) * 30 || 0);
   }, 0);
 
   const startDate = new Date(dateRange.start);

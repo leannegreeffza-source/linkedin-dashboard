@@ -354,10 +354,10 @@ export default function Dashboard() {
                       <DateRangePicker value={previousRange} onChange={setPreviousRange} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">ZAR → USD Rate</p>
+                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Exchange Rate (ZAR/USD)</p>
                       <input type="number" step="0.01" value={exchangeRate}
                         onChange={e => setExchangeRate(parseFloat(e.target.value))}
-                        className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white" />
+                        className="w-28 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div className="ml-auto">
                       <button onClick={loadAnalytics} disabled={loading}
@@ -377,12 +377,12 @@ export default function Dashboard() {
                       { label: 'Impressions', key: 'impressions', format: 'number', icon: Eye },
                       { label: 'Clicks', key: 'clicks', format: 'number', icon: MousePointer },
                       { label: 'CTR', key: 'ctr', format: 'percent', icon: TrendingUp },
-                      { label: 'Spent', key: 'spent', format: 'currency', icon: DollarSign },
-                      { label: 'CPM', key: 'cpm', format: 'currency', icon: DollarSign },
-                      { label: 'CPC', key: 'cpc', format: 'currency', icon: DollarSign },
+                      { label: 'Spent', key: 'spent', format: 'decimal', icon: DollarSign },
+                      { label: 'CPM', key: 'cpm', format: 'decimal', icon: DollarSign },
+                      { label: 'CPC', key: 'cpc', format: 'decimal', icon: DollarSign },
                       { label: 'Website Visits', key: 'websiteVisits', format: 'number', icon: Target },
                       { label: 'Leads', key: 'leads', format: 'number', icon: Users },
-                      { label: 'CPL', key: 'cpl', format: 'currency', icon: DollarSign },
+                      { label: 'CPL', key: 'cpl', format: 'decimal', icon: DollarSign },
                       { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp },
                       { label: 'Engagements', key: 'engagements', format: 'number', icon: Users },
                     ].map(metric => (
@@ -391,8 +391,7 @@ export default function Dashboard() {
                         current={reportData.current[metric.key]}
                         previous={reportData.previous[metric.key]}
                         format={metric.format}
-                        icon={metric.icon}
-                        exchangeRate={exchangeRate} />
+                        icon={metric.icon} />
                     ))}
                   </div>
                 </div>
@@ -418,7 +417,7 @@ export default function Dashboard() {
                             <td className="py-3 text-sm text-right text-slate-300">{ad.impressions.toLocaleString()}</td>
                             <td className="py-3 text-sm text-right text-slate-300">{ad.clicks.toLocaleString()}</td>
                             <td className="py-3 text-sm text-right text-slate-300">{ad.ctr}%</td>
-                            <td className="py-3 text-sm text-right text-slate-300">${ad.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td className="py-3 text-sm text-right text-slate-300">{ad.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -441,12 +440,12 @@ export default function Dashboard() {
   );
 }
 
-function MetricCard({ label, current, previous, format, icon: Icon, exchangeRate }) {
+function MetricCard({ label, current, previous, format, icon: Icon }) {
   const change = previous > 0 ? ((current - previous) / previous * 100) : 0;
   const isPositive = change >= 0;
 
   function formatValue(val) {
-    if (format === 'currency') return `$${val.toFixed(2)}`;
+    if (format === 'decimal') return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     if (format === 'percent') return `${val.toFixed(2)}%`;
     return val.toLocaleString();
   }
@@ -478,7 +477,7 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
       <h3 className="text-lg font-bold text-white mb-6">Budgeting and Pacing</h3>
       <div className="grid grid-cols-3 gap-6 mb-6">
         <div>
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget ($)</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget</label>
           <input
             type="number"
             placeholder="Enter budget..."
@@ -490,7 +489,7 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Spent</label>
           <div className="text-2xl font-bold text-white">
-            ${pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            {pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
           </div>
         </div>
         <div>

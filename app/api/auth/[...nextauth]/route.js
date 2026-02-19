@@ -9,7 +9,7 @@ export const authOptions = {
       client: {
         token_endpoint_auth_method: "client_secret_post",
       },
-      issuer: "https://www.linkedin.com",
+      issuer: "https://www.linkedin.com/oauth",
       authorization: {
         params: { scope: "openid profile email r_ads r_ads_reporting" },
       },

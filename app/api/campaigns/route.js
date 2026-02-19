@@ -15,7 +15,7 @@ export async function POST(request) {
 
     const headers = {
       'Authorization': `Bearer ${token.accessToken}`,
-      'Linkedin-Version': '202302',
+      'Linkedin-Version': '202504',
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
@@ -24,15 +24,37 @@ export async function POST(request) {
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
 
-      const url = `https://api.linkedin.com/v2/adCampaignsV2?q=search&search.account.values[0]=${accountUrn}&search.status.values[0]=ACTIVE&search.status.values[1]=PAUSED&count=100`;
-      console.log('Fetching campaigns:', url);
+      // Use accounts filter directly in the URL
+      const url = `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${accountUrn}&count=100`;
+      console.log('Fetching campaigns URL:', url);
 
       const res = await fetch(url, { headers });
-      console.log('Campaign response status:', res.status);
+      console.log('Campaigns status:', res.status);
 
       if (!res.ok) {
-        const err = await res.text();
-        console.error('Campaign fetch failed:', err);
+        const errText = await res.text();
+        console.error('Campaigns failed:', errText);
+
+        // Fallback: try fetching all campaigns for the account using different param
+        const fallbackUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&accounts=List(${accountUrn})&count=100`;
+        console.log('Trying fallback URL:', fallbackUrl);
+        const fallbackRes = await fetch(fallbackUrl, { headers });
+        console.log('Fallback status:', fallbackRes.status);
+
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          console.log('Fallback campaigns found:', fallbackData.elements?.length);
+          (fallbackData.elements || []).forEach(c => {
+            allCampaigns.push({
+              id: c.id,
+              name: c.name || `Campaign ${c.id}`,
+              accountId,
+              status: c.status,
+            });
+          });
+        } else {
+          console.error('Fallback also failed:', await fallbackRes.text());
+        }
         continue;
       }
 
@@ -45,12 +67,11 @@ export async function POST(request) {
           name: c.name || `Campaign ${c.id}`,
           accountId,
           status: c.status,
-          totalBudget: c.totalBudget?.amount || 0,
-          dailyBudget: c.dailyBudget?.amount || 0,
         });
       });
     }
 
+    console.log('Total campaigns:', allCampaigns.length);
     return NextResponse.json(allCampaigns);
 
   } catch (error) {

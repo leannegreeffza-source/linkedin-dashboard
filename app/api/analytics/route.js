@@ -29,6 +29,8 @@ export async function POST(request) {
     const topAds = getTopAds(currentData.creatives, 5);
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
 
+    console.log('Current metrics:', current);
+
     return NextResponse.json({ current, previous, topAds, budgetPacing });
 
   } catch (error) {
@@ -42,47 +44,58 @@ async function fetchPeriodData(accountIds, campaignIds, dateRange, headers) {
   const [ey, em, ed] = dateRange.end.split('-');
 
   let allData = {
-    impressions: 0, clicks: 0, spend: 0,
-    landingPageClicks: 0, leads: 0, likes: 0,
-    comments: 0, shares: 0, follows: 0,
-    otherEngagements: 0, creatives: [], campaigns: []
+    impressions: 0,
+    clicks: 0,
+    spend: 0,
+    landingPageClicks: 0,
+    leads: 0,
+    likes: 0,
+    comments: 0,
+    shares: 0,
+    follows: 0,
+    otherEngagements: 0,
+    creatives: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
 
-  // If specific campaigns selected, query by campaign
+  // Fields - removed externalWebsiteConversions and landingPageClicks as they are unreliable
+  // Using oneClickLeads for native LinkedIn lead gen forms instead
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,pivotValues';
+
   if (campaignIds && campaignIds.length > 0) {
     const campaignUrns = campaignIds
       .map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`))
       .join(',');
 
-    const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=impressions,clicks,costInLocalCurrency,landingPageClicks,externalWebsiteConversions,likes,comments,shares,follows,otherEngagements,pivotValues`;
+    const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
+    console.log('Analytics by campaigns:', url);
 
-    console.log('Analytics by campaigns URL:', url);
     const res = await fetch(url, { headers });
-    console.log('Analytics response:', res.status);
+    console.log('Analytics status:', res.status);
 
     if (res.ok) {
       const data = await res.json();
       console.log('Elements:', data.elements?.length);
+      if (data.elements?.[0]) console.log('Sample element:', JSON.stringify(data.elements[0]));
       aggregateData(allData, data.elements || []);
     } else {
       console.error('Analytics failed:', await res.text());
     }
 
   } else {
-    // Query by account
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
-      const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=impressions,clicks,costInLocalCurrency,landingPageClicks,externalWebsiteConversions,likes,comments,shares,follows,otherEngagements,pivotValues`;
+      const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
+      console.log('Analytics by account:', url);
 
-      console.log('Analytics by account URL:', url);
       const res = await fetch(url, { headers });
-      console.log('Analytics response:', res.status);
+      console.log('Analytics status:', res.status);
 
       if (res.ok) {
         const data = await res.json();
         console.log('Elements:', data.elements?.length);
+        if (data.elements?.[0]) console.log('Sample element:', JSON.stringify(data.elements[0]));
         aggregateData(allData, data.elements || []);
       } else {
         console.error('Analytics failed:', await res.text());
@@ -99,8 +112,7 @@ function aggregateData(allData, elements) {
     allData.impressions += el.impressions || 0;
     allData.clicks += el.clicks || 0;
     allData.spend += parseFloat(el.costInLocalCurrency || 0);
-    allData.landingPageClicks += el.landingPageClicks || 0;
-    allData.leads += el.externalWebsiteConversions || 0;
+    allData.leads += el.oneClickLeads || 0;
     allData.likes += el.likes || 0;
     allData.comments += el.comments || 0;
     allData.shares += el.shares || 0;
@@ -113,23 +125,24 @@ function aggregateData(allData, elements) {
         impressions: el.impressions || 0,
         clicks: el.clicks || 0,
         spent: parseFloat(el.costInLocalCurrency || 0),
-        landingPageClicks: el.landingPageClicks || 0
       });
     }
   });
 }
 
 function calculateMetrics(data) {
-  const { impressions, clicks, spend, landingPageClicks: websiteVisits, leads, likes, comments, shares, follows } = data;
+  const { impressions, clicks, spend, leads, likes, comments, shares, follows } = data;
   const engagements = clicks + likes + comments + shares + follows;
 
   return {
-    impressions, clicks,
+    impressions,
+    clicks,
     ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
     spent: spend,
     cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
     cpc: clicks > 0 ? spend / clicks : 0,
-    websiteVisits, leads,
+    websiteVisits: 0, // Not reliably available via API
+    leads,
     cpl: leads > 0 ? spend / leads : 0,
     engagementRate: impressions > 0 ? (engagements / impressions) * 100 : 0,
     engagements

@@ -72,7 +72,7 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
     console.log('Fetching campaigns for account:', accountId);
 
     try {
-      const campaignUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(${encodeURIComponent(accountUrn)})))&count=100`;
+      campaignUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${encodeURIComponent(accountUrn)}&count=100`;
       console.log('Campaign URL:', campaignUrl);
 
       const campaignRes = await fetch(campaignUrl, { headers });

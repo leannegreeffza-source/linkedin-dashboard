@@ -4,8 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Search, TrendingUp, TrendingDown, DollarSign, MousePointer, Eye, Target, Users, RefreshCw, ChevronDown, Calendar } from 'lucide-react';
 
-// ========== DATE PICKER ==========
-
 function DateRangePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const [tempStart, setTempStart] = useState(value.start);
@@ -75,16 +73,15 @@ function DateRangePicker({ value, onChange }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
+        className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm font-medium text-white hover:bg-slate-600"
       >
-        <Calendar className="w-4 h-4 text-gray-500" />
+        <Calendar className="w-4 h-4 text-slate-400" />
         {formatDisplay(value.start, value.end)}
-        <ChevronDown className="w-4 h-4 text-gray-400" />
+        <ChevronDown className="w-4 h-4 text-slate-400" />
       </button>
 
       {open && (
         <div className="absolute top-full mt-2 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-2xl flex" style={{minWidth: 560}}>
-          {/* Presets */}
           <div className="w-40 border-r border-gray-100 py-2">
             {presets.map(p => (
               <button key={p.label} onClick={() => applyPreset(p.fn)}
@@ -92,13 +89,7 @@ function DateRangePicker({ value, onChange }) {
                 {p.label}
               </button>
             ))}
-            <button onClick={() => {}}
-              className="w-full text-left px-4 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50">
-              Custom
-            </button>
           </div>
-
-          {/* Custom date inputs */}
           <div className="p-4 flex-1">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
@@ -130,8 +121,6 @@ function DateRangePicker({ value, onChange }) {
     </div>
   );
 }
-
-// ========== MAIN DASHBOARD ==========
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -236,7 +225,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-900">
-      {/* Header */}
       <div className="bg-slate-800 border-b border-slate-700 shadow-lg">
         <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
@@ -369,7 +357,7 @@ export default function Dashboard() {
                       <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">ZAR → USD Rate</p>
                       <input type="number" step="0.01" value={exchangeRate}
                         onChange={e => setExchangeRate(parseFloat(e.target.value))}
-                        className="w-24 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm shadow-sm" />
+                        className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white" />
                     </div>
                     <div className="ml-auto">
                       <button onClick={loadAnalytics} disabled={loading}
@@ -409,7 +397,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Top Ads */}
+                {/* Top Campaigns Table */}
                 {reportData.topAds?.length > 0 && (
                   <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
                     <h3 className="text-lg font-bold text-white mb-4">Top Performing Campaigns</h3>
@@ -430,7 +418,7 @@ export default function Dashboard() {
                             <td className="py-3 text-sm text-right text-slate-300">{ad.impressions.toLocaleString()}</td>
                             <td className="py-3 text-sm text-right text-slate-300">{ad.clicks.toLocaleString()}</td>
                             <td className="py-3 text-sm text-right text-slate-300">{ad.ctr}%</td>
-                            <td className="py-3 text-sm text-right text-slate-300">R {ad.spent.toLocaleString()}</td>
+                            <td className="py-3 text-sm text-right text-slate-300">${ad.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -458,7 +446,7 @@ function MetricCard({ label, current, previous, format, icon: Icon, exchangeRate
   const isPositive = change >= 0;
 
   function formatValue(val) {
-    if (format === 'currency') return `$${(val / exchangeRate).toFixed(2)}`;
+    if (format === 'currency') return `$${val.toFixed(2)}`;
     if (format === 'percent') return `${val.toFixed(2)}%`;
     return val.toLocaleString();
   }
@@ -481,7 +469,7 @@ function MetricCard({ label, current, previous, format, icon: Icon, exchangeRate
 function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
   if (!pacing) return null;
 
-  const budget = parseFloat(manualBudget) || pacing.budget || 0;
+  const budget = parseFloat(manualBudget) || 0;
   const pacingPercent = budget > 0 ? Math.min((pacing.spent / budget * 100), 100).toFixed(1) : 0;
   const dayProgress = pacing.daysTotal > 0 ? (pacing.daysElapsed / pacing.daysTotal * 100).toFixed(1) : 0;
 
@@ -490,7 +478,7 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
       <h3 className="text-lg font-bold text-white mb-6">Budgeting and Pacing</h3>
       <div className="grid grid-cols-3 gap-6 mb-6">
         <div>
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget (ZAR)</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget ($)</label>
           <input
             type="number"
             placeholder="Enter budget..."
@@ -501,7 +489,9 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
         </div>
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Spent</label>
-          <div className="text-2xl font-bold text-white">R {pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          <div className="text-2xl font-bold text-white">
+            ${pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+          </div>
         </div>
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Pacing</label>

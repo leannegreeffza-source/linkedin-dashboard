@@ -15,7 +15,7 @@ export async function POST(request) {
 
     const headers = {
       'Authorization': `Bearer ${token.accessToken}`,
-      'Linkedin-Version': '202504',
+      'Linkedin-Version': '202302',
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
@@ -24,17 +24,21 @@ export async function POST(request) {
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
 
-      const res = await fetch(
-        `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${accountUrn}&count=100`,
-        { headers }
-      );
+      const url = `https://api.linkedin.com/v2/adCampaignsV2?q=search&search.account.values[0]=${accountUrn}&search.status.values[0]=ACTIVE&search.status.values[1]=PAUSED&count=100`;
+      console.log('Fetching campaigns:', url);
+
+      const res = await fetch(url, { headers });
+      console.log('Campaign response status:', res.status);
 
       if (!res.ok) {
-        console.error('Failed to fetch campaigns for account', accountId, await res.text());
+        const err = await res.text();
+        console.error('Campaign fetch failed:', err);
         continue;
       }
 
       const data = await res.json();
+      console.log('Campaigns found:', data.elements?.length);
+
       (data.elements || []).forEach(c => {
         allCampaigns.push({
           id: c.id,

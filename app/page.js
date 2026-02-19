@@ -224,219 +224,250 @@ export default function Dashboard() {
   if (!session) return <SignInScreen />;
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <div className="bg-slate-800 border-b border-slate-700 shadow-lg">
-        <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-white">LinkedIn Campaign Manager</h1>
-            <p className="text-sm text-slate-400">{accounts.length} accounts • {selectedAccounts.length} selected</p>
-          </div>
-          <button onClick={() => signOut()}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm">
-            Sign Out
-          </button>
-        </div>
-      </div>
+    <>
+      {/* Print styles injected into head */}
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: #0f172a !important; }
+          @page { margin: 1cm; }
+        }
+      `}</style>
 
-      <div className="max-w-screen-2xl mx-auto p-6">
-        <div className="grid grid-cols-12 gap-6">
+      <div className="min-h-screen bg-slate-900">
 
-          {/* Sidebar */}
-          <div className="col-span-3 space-y-4">
-
-            {/* Account Selector */}
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-              <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">Accounts</h2>
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input type="text" placeholder="Search accounts..."
-                  value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
-              </div>
-              <div className="flex gap-2 mb-3">
-                <button onClick={() => setSelectedAccounts(filteredAccounts.map(a => a.id))}
-                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
-                  All
-                </button>
-                {selectedAccounts.length > 0 && (
-                  <button onClick={() => setSelectedAccounts([])}
-                    className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
-                    Clear ({selectedAccounts.length})
-                  </button>
-                )}
-              </div>
-              <div className="space-y-1 max-h-64 overflow-y-auto">
-                {filteredAccounts.map(acc => (
-                  <label key={acc.id}
-                    className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
-                      selectedAccounts.includes(acc.id)
-                        ? 'bg-blue-900 border-blue-500 text-white'
-                        : 'border-slate-600 text-slate-300 hover:bg-slate-700'
-                    }`}>
-                    <input type="checkbox" checked={selectedAccounts.includes(acc.id)}
-                      onChange={() => toggleAccount(acc.id)} className="w-4 h-4 accent-blue-500" />
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{acc.name}</div>
-                      <div className="text-xs text-slate-400">ID: {acc.id}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
+        {/* Header */}
+        <div className="bg-slate-800 border-b border-slate-700 shadow-lg">
+          <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-white">LinkedIn Campaign Manager</h1>
+              <p className="text-sm text-slate-400">{accounts.length} accounts • {selectedAccounts.length} selected</p>
             </div>
+            <div className="flex gap-3 no-print">
+              {reportData && (
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold text-sm flex items-center gap-2">
+                  ↓ Export PDF
+                </button>
+              )}
+              <button onClick={() => signOut()}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm">
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
 
-            {/* Campaign Selector */}
-            {selectedAccounts.length > 0 && (
+        <div className="max-w-screen-2xl mx-auto p-6">
+          <div className="grid grid-cols-12 gap-6">
+
+            {/* Sidebar - hidden when printing */}
+            <div className="col-span-3 space-y-4 no-print">
+
+              {/* Account Selector */}
               <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">
-                  Campaigns {loadingCampaigns && <span className="text-slate-400 font-normal text-xs">(loading...)</span>}
-                </h2>
+                <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">Accounts</h2>
                 <div className="relative mb-3">
                   <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                  <input type="text" placeholder="Search campaigns..."
-                    value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)}
+                  <input type="text" placeholder="Search accounts..."
+                    value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
                 </div>
                 <div className="flex gap-2 mb-3">
-                  <button onClick={() => setSelectedCampaigns(filteredCampaigns.map(c => c.id))}
+                  <button onClick={() => setSelectedAccounts(filteredAccounts.map(a => a.id))}
                     className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
                     All
                   </button>
-                  {selectedCampaigns.length > 0 && (
-                    <button onClick={() => setSelectedCampaigns([])}
+                  {selectedAccounts.length > 0 && (
+                    <button onClick={() => setSelectedAccounts([])}
                       className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
-                      Clear ({selectedCampaigns.length})
+                      Clear ({selectedAccounts.length})
                     </button>
                   )}
                 </div>
                 <div className="space-y-1 max-h-64 overflow-y-auto">
-                  {filteredCampaigns.map(c => (
-                    <label key={c.id}
+                  {filteredAccounts.map(acc => (
+                    <label key={acc.id}
                       className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
-                        selectedCampaigns.includes(c.id)
+                        selectedAccounts.includes(acc.id)
                           ? 'bg-blue-900 border-blue-500 text-white'
                           : 'border-slate-600 text-slate-300 hover:bg-slate-700'
                       }`}>
-                      <input type="checkbox" checked={selectedCampaigns.includes(c.id)}
-                        onChange={() => toggleCampaign(c.id)} className="w-4 h-4 accent-blue-500" />
+                      <input type="checkbox" checked={selectedAccounts.includes(acc.id)}
+                        onChange={() => toggleAccount(acc.id)} className="w-4 h-4 accent-blue-500" />
                       <div className="min-w-0">
-                        <div className="font-medium truncate text-xs">{c.name}</div>
-                        <div className="text-xs text-slate-400">ID: {c.id}</div>
+                        <div className="font-medium truncate">{acc.name}</div>
+                        <div className="text-xs text-slate-400">ID: {acc.id}</div>
                       </div>
                     </label>
                   ))}
-                  {filteredCampaigns.length === 0 && !loadingCampaigns && (
-                    <p className="text-slate-400 text-xs text-center py-4">No campaigns found</p>
-                  )}
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Main Content */}
-          <div className="col-span-9">
-            {!reportData ? (
-              <div className="bg-slate-800 rounded-xl p-12 text-center border border-slate-700">
-                <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Select Accounts to View Report</h2>
-                <p className="text-slate-400">Choose one or more accounts from the sidebar</p>
-              </div>
-            ) : (
-              <>
-                {/* Controls Bar */}
-                <div className="bg-slate-800 rounded-xl p-4 mb-6 border border-slate-700">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Current Period</p>
-                      <DateRangePicker value={currentRange} onChange={setCurrentRange} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Compare Period</p>
-                      <DateRangePicker value={previousRange} onChange={setPreviousRange} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Exchange Rate (ZAR/USD)</p>
-                      <input type="number" step="0.01" value={exchangeRate}
-                        onChange={e => setExchangeRate(parseFloat(e.target.value))}
-                        className="w-28 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
-                    </div>
-                    <div className="ml-auto">
-                      <button onClick={loadAnalytics} disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm">
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                        Refresh
+              {/* Campaign Selector */}
+              {selectedAccounts.length > 0 && (
+                <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                  <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">
+                    Campaigns {loadingCampaigns && <span className="text-slate-400 font-normal text-xs">(loading...)</span>}
+                  </h2>
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                    <input type="text" placeholder="Search campaigns..."
+                      value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="flex gap-2 mb-3">
+                    <button onClick={() => setSelectedCampaigns(filteredCampaigns.map(c => c.id))}
+                      className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+                      All
+                    </button>
+                    {selectedCampaigns.length > 0 && (
+                      <button onClick={() => setSelectedCampaigns([])}
+                        className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
+                        Clear ({selectedCampaigns.length})
                       </button>
+                    )}
+                  </div>
+                  <div className="space-y-1 max-h-64 overflow-y-auto">
+                    {filteredCampaigns.map(c => (
+                      <label key={c.id}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
+                          selectedCampaigns.includes(c.id)
+                            ? 'bg-blue-900 border-blue-500 text-white'
+                            : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                        }`}>
+                        <input type="checkbox" checked={selectedCampaigns.includes(c.id)}
+                          onChange={() => toggleCampaign(c.id)} className="w-4 h-4 accent-blue-500" />
+                        <div className="min-w-0">
+                          <div className="font-medium truncate text-xs">{c.name}</div>
+                          <div className="text-xs text-slate-400">ID: {c.id}</div>
+                        </div>
+                      </label>
+                    ))}
+                    {filteredCampaigns.length === 0 && !loadingCampaigns && (
+                      <p className="text-slate-400 text-xs text-center py-4">No campaigns found</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Main Content - full width when printing */}
+            <div className="col-span-9 print:col-span-12">
+              {!reportData ? (
+                <div className="bg-slate-800 rounded-xl p-12 text-center border border-slate-700">
+                  <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-white mb-2">Select Accounts to View Report</h2>
+                  <p className="text-slate-400">Choose one or more accounts from the sidebar</p>
+                </div>
+              ) : (
+                <>
+                  {/* Controls Bar - hidden when printing */}
+                  <div className="bg-slate-800 rounded-xl p-4 mb-6 border border-slate-700 no-print">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Current Period</p>
+                        <DateRangePicker value={currentRange} onChange={setCurrentRange} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Compare Period</p>
+                        <DateRangePicker value={previousRange} onChange={setPreviousRange} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Exchange Rate (ZAR/USD)</p>
+                        <input type="number" step="0.01" value={exchangeRate}
+                          onChange={e => setExchangeRate(parseFloat(e.target.value))}
+                          className="w-28 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
+                      </div>
+                      <div className="ml-auto">
+                        <button onClick={loadAnalytics} disabled={loading}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm">
+                          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                          Refresh
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Metrics Grid */}
-                <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
-                  <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
-                  <div className="grid grid-cols-4 gap-4">
-                    {[
-                      { label: 'Impressions', key: 'impressions', format: 'number', icon: Eye },
-                      { label: 'Clicks', key: 'clicks', format: 'number', icon: MousePointer },
-                      { label: 'CTR', key: 'ctr', format: 'percent', icon: TrendingUp },
-                      { label: 'Spent', key: 'spent', format: 'decimal', icon: DollarSign },
-                      { label: 'CPM', key: 'cpm', format: 'decimal', icon: DollarSign },
-                      { label: 'CPC', key: 'cpc', format: 'decimal', icon: DollarSign },
-                      { label: 'Website Visits', key: 'websiteVisits', format: 'number', icon: Target },
-                      { label: 'Leads', key: 'leads', format: 'number', icon: Users },
-                      { label: 'CPL', key: 'cpl', format: 'decimal', icon: DollarSign },
-                      { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp },
-                      { label: 'Engagements', key: 'engagements', format: 'number', icon: Users },
-                    ].map(metric => (
-                      <MetricCard key={metric.key}
-                        label={metric.label}
-                        current={reportData.current[metric.key]}
-                        previous={reportData.previous[metric.key]}
-                        format={metric.format}
-                        icon={metric.icon} />
-                    ))}
+                  {/* Print header - only visible when printing */}
+                  <div className="hidden print:block mb-6">
+                    <h2 className="text-xl font-bold text-white">LinkedIn Campaign Report</h2>
+                    <p className="text-slate-400 text-sm">
+                      Period: {currentRange.start} – {currentRange.end} | 
+                      Compare: {previousRange.start} – {previousRange.end}
+                    </p>
                   </div>
-                </div>
 
-                {/* Top Campaigns Table */}
-                {reportData.topAds?.length > 0 && (
+                  {/* Metrics Grid */}
                   <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
-                    <h3 className="text-lg font-bold text-white mb-4">Top Performing Campaigns</h3>
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-700">
-                          <th className="pb-3 text-left text-xs font-bold text-slate-400 uppercase">ID</th>
-                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Impressions</th>
-                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Clicks</th>
-                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">CTR</th>
-                          <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Spent</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700">
-                        {reportData.topAds.map(ad => (
-                          <tr key={ad.id} className="hover:bg-slate-700/50">
-                            <td className="py-3 text-sm font-semibold text-white">{ad.id}</td>
-                            <td className="py-3 text-sm text-right text-slate-300">{ad.impressions.toLocaleString()}</td>
-                            <td className="py-3 text-sm text-right text-slate-300">{ad.clicks.toLocaleString()}</td>
-                            <td className="py-3 text-sm text-right text-slate-300">{ad.ctr}%</td>
-                            <td className="py-3 text-sm text-right text-slate-300">{ad.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
+                    <div className="grid grid-cols-4 gap-4">
+                      {[
+                        { label: 'Impressions', key: 'impressions', format: 'number', icon: Eye },
+                        { label: 'Clicks', key: 'clicks', format: 'number', icon: MousePointer },
+                        { label: 'CTR', key: 'ctr', format: 'percent', icon: TrendingUp },
+                        { label: 'Spent', key: 'spent', format: 'decimal', icon: DollarSign },
+                        { label: 'CPM', key: 'cpm', format: 'decimal', icon: DollarSign },
+                        { label: 'CPC', key: 'cpc', format: 'decimal', icon: DollarSign },
+                        { label: 'Website Visits', key: 'websiteVisits', format: 'number', icon: Target },
+                        { label: 'Leads', key: 'leads', format: 'number', icon: Users },
+                        { label: 'CPL', key: 'cpl', format: 'decimal', icon: DollarSign },
+                        { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp },
+                        { label: 'Engagements', key: 'engagements', format: 'number', icon: Users },
+                      ].map(metric => (
+                        <MetricCard key={metric.key}
+                          label={metric.label}
+                          current={reportData.current[metric.key]}
+                          previous={reportData.previous[metric.key]}
+                          format={metric.format}
+                          icon={metric.icon} />
+                      ))}
+                    </div>
                   </div>
-                )}
 
-                {/* Budget Pacing */}
-                <BudgetPacingCard
-                  pacing={reportData.budgetPacing}
-                  manualBudget={manualBudget}
-                  onBudgetChange={setManualBudget}
-                />
-              </>
-            )}
+                  {/* Top Campaigns Table */}
+                  {reportData.topAds?.length > 0 && (
+                    <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
+                      <h3 className="text-lg font-bold text-white mb-4">Top Performing Campaigns</h3>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-slate-700">
+                            <th className="pb-3 text-left text-xs font-bold text-slate-400 uppercase">ID</th>
+                            <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Impressions</th>
+                            <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Clicks</th>
+                            <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">CTR</th>
+                            <th className="pb-3 text-right text-xs font-bold text-slate-400 uppercase">Spent</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700">
+                          {reportData.topAds.map(ad => (
+                            <tr key={ad.id} className="hover:bg-slate-700/50">
+                              <td className="py-3 text-sm font-semibold text-white">{ad.id}</td>
+                              <td className="py-3 text-sm text-right text-slate-300">{ad.impressions.toLocaleString()}</td>
+                              <td className="py-3 text-sm text-right text-slate-300">{ad.clicks.toLocaleString()}</td>
+                              <td className="py-3 text-sm text-right text-slate-300">{ad.ctr}%</td>
+                              <td className="py-3 text-sm text-right text-slate-300">{ad.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Budget Pacing */}
+                  <BudgetPacingCard
+                    pacing={reportData.budgetPacing}
+                    manualBudget={manualBudget}
+                    onBudgetChange={setManualBudget}
+                  />
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -483,8 +514,11 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
             placeholder="Enter budget..."
             value={manualBudget}
             onChange={e => onBudgetChange(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500"
+            className="no-print w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500"
           />
+          {manualBudget && (
+            <div className="print:block hidden text-2xl font-bold text-white">{parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          )}
         </div>
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Spent</label>

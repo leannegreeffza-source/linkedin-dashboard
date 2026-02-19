@@ -7,13 +7,12 @@ export const maxDuration = 60;
 export async function POST(request) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-    
+
     if (!token?.accessToken) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
     const { accountIds, currentRange, previousRange } = await request.json();
-
     console.log('Analytics request for accounts:', accountIds);
 
     const headers = {
@@ -60,44 +59,12 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
   };
 
   for (const accountId of accountIds) {
-    const accountUrn = `urn:li:sponsoredAccount:${accountId}`;
-    console.log('Fetching campaigns for account:', accountId);
+    const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
+    console.log('Fetching analytics for account:', accountId);
 
     try {
-      const fetchUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${encodeURIComponent(accountUrn)}&count=100`;
-      console.log('Campaign URL:', fetchUrl);
-
-      const campaignRes = await fetch(fetchUrl, { headers });
-      console.log('Campaign response status:', campaignRes.status);
-
-      if (!campaignRes.ok) {
-        const errText = await campaignRes.text();
-        console.error('Campaign fetch failed:', campaignRes.status, errText);
-        continue;
-      }
-
-      const campaignData = await campaignRes.json();
-      console.log('Campaigns found:', campaignData.elements?.length, 'for account', accountId);
-
-      const campaigns = campaignData.elements || [];
-      if (campaigns.length === 0) {
-        console.log('No campaigns for account', accountId);
-        continue;
-      }
-
-      allData.campaigns.push(...campaigns.map(c => ({
-        id: c.id,
-        name: c.name,
-        dailyBudget: c.dailyBudget?.amount || 0,
-        totalBudget: c.totalBudget?.amount || 0,
-        runSchedule: c.runSchedule
-      })));
-
-      const campaignUrns = campaigns
-        .map(c => encodeURIComponent(`urn:li:sponsoredCampaign:${c.id}`))
-        .join(',');
-
-      const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))&campaigns=List(${campaignUrns})&fields=impressions,clicks,costInLocalCurrency,landingPageClicks,externalWebsiteConversions,likes,comments,shares,follows,otherEngagements,pivotValues`;
+      // Query analytics directly by account - no need to fetch campaigns first
+      const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))&accounts=List(${accountUrn})&fields=impressions,clicks,costInLocalCurrency,landingPageClicks,externalWebsiteConversions,likes,comments,shares,follows,otherEngagements,pivotValues`;
 
       console.log('Analytics URL:', analyticsUrl);
 
@@ -112,9 +79,12 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
 
       const analyticsData = await analyticsRes.json();
       console.log('Analytics elements count:', analyticsData.elements?.length);
+      if (analyticsData.elements?.length > 0) {
+        console.log('First element sample:', JSON.stringify(analyticsData.elements[0]));
+      }
 
       (analyticsData.elements || []).forEach(el => {
-        const creativeUrn = el.pivotValues?.[0];
+        const pivotUrn = el.pivotValues?.[0];
 
         allData.impressions += el.impressions || 0;
         allData.clicks += el.clicks || 0;
@@ -127,9 +97,9 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
         allData.follows += el.follows || 0;
         allData.otherEngagements += el.otherEngagements || 0;
 
-        if (creativeUrn) {
+        if (pivotUrn) {
           allData.creatives.push({
-            id: creativeUrn.split(':').pop(),
+            id: pivotUrn.split(':').pop(),
             impressions: el.impressions || 0,
             clicks: el.clicks || 0,
             spent: parseFloat(el.costInLocalCurrency || 0),
@@ -146,8 +116,7 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
   console.log('Total aggregated data:', {
     impressions: allData.impressions,
     clicks: allData.clicks,
-    spend: allData.spend,
-    campaigns: allData.campaigns.length
+    spend: allData.spend
   });
 
   return allData;
@@ -192,10 +161,6 @@ function getTopAds(creatives, count) {
 }
 
 function calculateBudgetPacing(data, dateRange) {
-  const totalBudget = data.campaigns.reduce((sum, c) => {
-    return sum + (parseFloat(c.totalBudget) || parseFloat(c.dailyBudget) * 30 || 0);
-  }, 0);
-
   const startDate = new Date(dateRange.start);
   const endDate = new Date(dateRange.end);
   const today = new Date();
@@ -207,7 +172,7 @@ function calculateBudgetPacing(data, dateRange) {
   );
 
   return {
-    budget: totalBudget,
+    budget: 0,
     spent: data.spend,
     daysTotal: totalDays,
     daysElapsed: elapsedDays

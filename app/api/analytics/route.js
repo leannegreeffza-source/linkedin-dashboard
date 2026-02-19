@@ -14,25 +14,26 @@ export async function POST(request) {
 
     const { accountIds, currentRange, previousRange, exchangeRate } = await request.json();
 
+    console.log('Analytics request for accounts:', accountIds);
+    console.log('Current range:', currentRange);
+    console.log('Previous range:', previousRange);
+
     const headers = {
       'Authorization': `Bearer ${token.accessToken}`,
       'Linkedin-Version': '202504',
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
-    // Fetch data for both periods
     const currentData = await fetchPeriodData(accountIds, currentRange, headers);
     const previousData = await fetchPeriodData(accountIds, previousRange, headers);
 
-    // Calculate metrics
     const current = calculateMetrics(currentData);
     const previous = calculateMetrics(previousData);
 
-    // Get top ads
     const topAds = getTopAds(currentData.creatives, 5);
-
-    // Calculate budget pacing
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
+
+    console.log('Final current metrics:', current);
 
     return NextResponse.json({
       current,
@@ -68,22 +69,30 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
 
   for (const accountId of accountIds) {
     const accountUrn = `urn:li:sponsoredAccount:${accountId}`;
+    console.log('Fetching campaigns for account:', accountId);
 
-    // Fetch campaigns for this account
     try {
-      const campaignRes = await fetch(
-        `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(${encodeURIComponent(accountUrn)})))&count=100`,
-        { headers }
-      );
+      const campaignUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search=(account:(values:List(${encodeURIComponent(accountUrn)})))&count=100`;
+      console.log('Campaign URL:', campaignUrl);
 
-      if (!campaignRes.ok) continue;
+      const campaignRes = await fetch(campaignUrl, { headers });
+      console.log('Campaign response status:', campaignRes.status);
+
+      if (!campaignRes.ok) {
+        const errText = await campaignRes.text();
+        console.error('Campaign fetch failed:', campaignRes.status, errText);
+        continue;
+      }
 
       const campaignData = await campaignRes.json();
+      console.log('Campaigns found:', campaignData.elements?.length, 'for account', accountId);
+
       const campaigns = campaignData.elements || [];
+      if (campaigns.length === 0) {
+        console.log('No campaigns for account', accountId);
+        continue;
+      }
 
-      if (campaigns.length === 0) continue;
-
-      // Store campaign info for budget tracking
       allData.campaigns.push(...campaigns.map(c => ({
         id: c.id,
         name: c.name,
@@ -96,43 +105,61 @@ async function fetchPeriodData(accountIds, dateRange, headers) {
         .map(c => encodeURIComponent(`urn:li:sponsoredCampaign:${c.id}`))
         .join(',');
 
-      // Fetch analytics
       const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))&campaigns=List(${campaignUrns})&fields=impressions,clicks,costInLocalCurrency,landingPageClicks,externalWebsiteConversions,likes,comments,shares,follows,otherEngagements,pivotValues`;
 
+      console.log('Analytics URL:', analyticsUrl);
+
       const analyticsRes = await fetch(analyticsUrl, { headers });
+      console.log('Analytics response status:', analyticsRes.status);
 
-      if (analyticsRes.ok) {
-        const analyticsData = await analyticsRes.json();
-        
-        (analyticsData.elements || []).forEach(el => {
-          const creativeUrn = el.pivotValues?.[0];
-          
-          allData.impressions += el.impressions || 0;
-          allData.clicks += el.clicks || 0;
-          allData.spend += parseFloat(el.costInLocalCurrency || 0);
-          allData.landingPageClicks += el.landingPageClicks || 0;
-          allData.leads += el.externalWebsiteConversions || 0;
-          allData.likes += el.likes || 0;
-          allData.comments += el.comments || 0;
-          allData.shares += el.shares || 0;
-          allData.follows += el.follows || 0;
-          allData.otherEngagements += el.otherEngagements || 0;
-
-          if (creativeUrn) {
-            allData.creatives.push({
-              id: creativeUrn.split(':').pop(),
-              impressions: el.impressions || 0,
-              clicks: el.clicks || 0,
-              spent: parseFloat(el.costInLocalCurrency || 0),
-              landingPageClicks: el.landingPageClicks || 0
-            });
-          }
-        });
+      if (!analyticsRes.ok) {
+        const errText = await analyticsRes.text();
+        console.error('Analytics fetch failed:', analyticsRes.status, errText);
+        continue;
       }
+
+      const analyticsData = await analyticsRes.json();
+      console.log('Analytics elements count:', analyticsData.elements?.length);
+      if (analyticsData.elements?.length > 0) {
+        console.log('First analytics element:', JSON.stringify(analyticsData.elements[0]));
+      }
+
+      (analyticsData.elements || []).forEach(el => {
+        const creativeUrn = el.pivotValues?.[0];
+
+        allData.impressions += el.impressions || 0;
+        allData.clicks += el.clicks || 0;
+        allData.spend += parseFloat(el.costInLocalCurrency || 0);
+        allData.landingPageClicks += el.landingPageClicks || 0;
+        allData.leads += el.externalWebsiteConversions || 0;
+        allData.likes += el.likes || 0;
+        allData.comments += el.comments || 0;
+        allData.shares += el.shares || 0;
+        allData.follows += el.follows || 0;
+        allData.otherEngagements += el.otherEngagements || 0;
+
+        if (creativeUrn) {
+          allData.creatives.push({
+            id: creativeUrn.split(':').pop(),
+            impressions: el.impressions || 0,
+            clicks: el.clicks || 0,
+            spent: parseFloat(el.costInLocalCurrency || 0),
+            landingPageClicks: el.landingPageClicks || 0
+          });
+        }
+      });
+
     } catch (err) {
       console.error(`Error fetching data for account ${accountId}:`, err);
     }
   }
+
+  console.log('Total aggregated data:', {
+    impressions: allData.impressions,
+    clicks: allData.clicks,
+    spend: allData.spend,
+    campaigns: allData.campaigns.length
+  });
 
   return allData;
 }
@@ -143,7 +170,6 @@ function calculateMetrics(data) {
   const spend = data.spend;
   const websiteVisits = data.landingPageClicks;
   const leads = data.leads;
-  
   const engagements = clicks + data.likes + data.comments + data.shares + data.follows;
 
   return {
@@ -169,24 +195,22 @@ function getTopAds(creatives, count) {
       id: creative.id,
       impressions: creative.impressions,
       clicks: creative.clicks,
-      ctr: creative.impressions > 0 
-        ? ((creative.clicks / creative.impressions) * 100).toFixed(2) 
+      ctr: creative.impressions > 0
+        ? ((creative.clicks / creative.impressions) * 100).toFixed(2)
         : '0.00',
       spent: creative.spent
     }));
 }
 
 function calculateBudgetPacing(data, dateRange) {
-  // Calculate total budget from campaigns
   const totalBudget = data.campaigns.reduce((sum, c) => {
     return sum + (c.totalBudget || c.dailyBudget * 30 || 0);
   }, 0);
 
-  // Calculate days elapsed
   const startDate = new Date(dateRange.start);
   const endDate = new Date(dateRange.end);
   const today = new Date();
-  
+
   const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
   const elapsedDays = Math.min(
     Math.ceil((today - startDate) / (1000 * 60 * 60 * 24)),

@@ -126,59 +126,38 @@ function SidebarSection({ title, loading, items, selectedIds, onToggle, onSelect
   return (
     <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-bold text-white text-sm uppercase tracking-wide">
-          {title}
-        </h2>
+        <h2 className="font-bold text-white text-sm uppercase tracking-wide">{title}</h2>
         <div className="flex items-center gap-2">
           {loading && <span className="text-slate-400 text-xs">(loading...)</span>}
           {selectedIds.length > 0 && (
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${accent.badge}`}>
-              {selectedIds.length} selected
-            </span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${accent.badge}`}>{selectedIds.length} selected</span>
           )}
         </div>
       </div>
-
       <div className="relative mb-3">
         <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
         <input type="text" placeholder={searchPlaceholder}
           value={searchValue} onChange={e => onSearchChange(e.target.value)}
           className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
       </div>
-
       <div className="flex gap-2 mb-3">
-        <button onClick={onSelectAll}
-          className={`flex-1 px-2 py-1.5 text-white rounded-lg text-xs font-medium ${accent.btn}`}>
-          Select All
-        </button>
+        <button onClick={onSelectAll} className={`flex-1 px-2 py-1.5 text-white rounded-lg text-xs font-medium ${accent.btn}`}>Select All</button>
         {selectedIds.length > 0 && (
-          <button onClick={onClear}
-            className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
+          <button onClick={onClear} className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
             Clear ({selectedIds.length})
           </button>
         )}
       </div>
-
       <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
         {items.map(item => (
-          <label key={item.id}
-            className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
-              selectedIds.includes(item.id)
-                ? `${accent.selected} text-white`
-                : 'border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
-            }`}>
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(item.id)}
-              onChange={() => onToggle(item.id)}
-              className="w-4 h-4 accent-blue-500 mt-0.5 flex-shrink-0" />
+          <label key={item.id} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
+            selectedIds.includes(item.id) ? `${accent.selected} text-white` : 'border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+          }`}>
+            <input type="checkbox" checked={selectedIds.includes(item.id)}
+              onChange={() => onToggle(item.id)} className="w-4 h-4 accent-blue-500 mt-0.5 flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="font-semibold text-xs text-white leading-snug truncate">
-                {item.name}
-              </div>
-              <div className="text-xs text-slate-400 font-mono mt-0.5">
-                ID: {item.id}
-              </div>
+              <div className="font-semibold text-xs text-white leading-snug truncate">{item.name}</div>
+              <div className="text-xs text-slate-400 font-mono mt-0.5">ID: {item.id}</div>
             </div>
           </label>
         ))}
@@ -247,6 +226,457 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
   );
 }
 
+function AIReportModal({ show, onClose, generatingReport, reportData, reportResult, currentRange, previousRange, campaignNameMap }) {
+  const reportRef = useRef(null);
+
+  function downloadHTML() {
+    if (!reportRef.current) return;
+    const html = generateFullHTML(reportResult, reportData, currentRange, previousRange, campaignNameMap);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `linkedin-report-${currentRange.start}-${currentRange.end}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!show) return null;
+
+  const report = reportResult?.report;
+  const metrics = reportResult?.metrics;
+
+  function statusColor(status) {
+    if (status === 'critical') return '#ff5252';
+    if (status === 'warning') return '#ff9800';
+    return '#4caf50';
+  }
+
+  function trendArrow(trend) {
+    if (trend === 'up') return '↑';
+    if (trend === 'down') return '↓';
+    return '→';
+  }
+
+  function perfBadge(perf) {
+    if (!perf) return '';
+    if (perf.includes('above')) return '✅ Above Benchmark';
+    if (perf.includes('below')) return '❌ Below Benchmark';
+    return '➖ At Benchmark';
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-6xl my-4 overflow-hidden shadow-2xl">
+
+        {/* Modal toolbar */}
+        <div className="flex justify-between items-center px-6 py-3 bg-gray-100 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-700">✦ AI Campaign Report</span>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Editable</span>
+          </div>
+          <div className="flex gap-2">
+            {report && !generatingReport && (
+              <button onClick={downloadHTML}
+                className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 font-medium">
+                ↓ Download HTML
+              </button>
+            )}
+            <button onClick={onClose}
+              className="px-4 py-1.5 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">
+              Close
+            </button>
+          </div>
+        </div>
+
+        {generatingReport ? (
+          <div className="flex flex-col items-center justify-center py-32 bg-white">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-6"></div>
+            <p className="text-gray-800 font-semibold text-xl">Analyzing your campaigns...</p>
+            <p className="text-gray-400 text-sm mt-2">This may take 15–30 seconds</p>
+          </div>
+        ) : report ? (
+          <div ref={reportRef} style={{fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", background: '#f4fbff', padding: '20px'}}>
+            <div style={{maxWidth: '100%', margin: '0 auto', background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', overflow: 'hidden'}}>
+
+              {/* Header */}
+              <div style={{background: '#0e1034', color: 'white', padding: '30px'}} contentEditable suppressContentEditableWarning>
+                <h1 style={{fontSize: '28px', marginBottom: '10px', margin: 0}}>📊 Campaign Optimization Summary</h1>
+                <p style={{opacity: 0.9, fontSize: '14px', marginTop: '10px'}}>
+                  <strong>Report Period:</strong> {currentRange.start} to {currentRange.end} &nbsp;|&nbsp;
+                  <strong>Compare Period:</strong> {previousRange.start} to {previousRange.end}
+                </p>
+              </div>
+
+              {/* Executive Summary */}
+              <div style={{padding: '20px 30px', background: '#f0f4ff', borderBottom: '1px solid #e0e0e0'}}>
+                <p style={{fontSize: '14px', color: '#333', lineHeight: 1.7}} contentEditable suppressContentEditableWarning>
+                  {report.executiveSummary}
+                </p>
+              </div>
+
+              {/* Summary Cards */}
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', padding: '30px'}}>
+                {[
+                  { label: 'Total Spend', value: metrics?.current?.spent?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), sub: `vs ${metrics?.previous?.spent?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} prev` },
+                  { label: 'Total Impressions', value: metrics?.current?.impressions?.toLocaleString(), sub: `${report.keyMetrics?.impressionsChange || ''} vs previous` },
+                  { label: 'Total Clicks', value: metrics?.current?.clicks?.toLocaleString(), sub: `${report.keyMetrics?.clicksChange || ''} vs previous` },
+                  { label: 'CTR', value: `${metrics?.current?.ctr?.toFixed(2)}%`, sub: `${report.keyMetrics?.ctrChange || ''} vs previous` },
+                  { label: 'CPL', value: metrics?.current?.cpl?.toFixed(2), sub: `${report.keyMetrics?.cplChange || ''} vs previous` },
+                  { label: 'Total Leads', value: metrics?.current?.leads, sub: `vs ${metrics?.previous?.leads} prev period` },
+                ].map((card, i) => (
+                  <div key={i} style={{background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}>
+                    <h3 style={{fontSize: '12px', color: '#666', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>{card.label}</h3>
+                    <div style={{fontSize: '28px', fontWeight: 'bold', color: '#0e1034', marginBottom: '5px'}} contentEditable suppressContentEditableWarning>{card.value}</div>
+                    <div style={{fontSize: '13px', color: '#999'}} contentEditable suppressContentEditableWarning>{card.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Campaign Performance Table */}
+              <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
+                <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Campaign Performance Comparison</h2>
+                <div style={{overflowX: 'auto'}}>
+                  <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '13px'}}>
+                    <thead>
+                      <tr>
+                        {['Campaign', 'Impressions', 'Clicks', 'CTR', 'Spent', 'Leads', 'CPL', 'Performance', 'Trend'].map(h => (
+                          <th key={h} style={{textAlign: 'left', padding: '12px', borderBottom: '1px solid #e0e0e0', background: '#f5f5f5', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#666'}}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metrics?.topCampaigns?.map((c, i) => {
+                        const analysis = report.campaignAnalysis?.find(a => String(a.id) === String(c.id));
+                        const name = campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`;
+                        return (
+                          <tr key={c.id} style={{background: i % 2 === 0 ? 'white' : '#fafafa'}}>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0'}} contentEditable suppressContentEditableWarning>
+                              <strong>{name}</strong><br/>
+                              <span style={{fontSize: '11px', color: '#999', fontFamily: 'monospace'}}>ID: {c.id}</span>
+                            </td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0'}} contentEditable suppressContentEditableWarning>{c.impressions.toLocaleString()}</td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0'}} contentEditable suppressContentEditableWarning>{c.clicks.toLocaleString()}</td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0'}} contentEditable suppressContentEditableWarning>{c.ctr}%</td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0'}} contentEditable suppressContentEditableWarning>{c.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0'}} contentEditable suppressContentEditableWarning>{c.leads || 0}</td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0'}} contentEditable suppressContentEditableWarning>
+                              {c.leads > 0 ? (c.spent / c.leads).toFixed(2) : '—'}
+                            </td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0', color: statusColor(analysis?.status)}} contentEditable suppressContentEditableWarning>
+                              {perfBadge(analysis?.performance)}
+                            </td>
+                            <td style={{padding: '12px', borderBottom: '1px solid #e0e0e0', fontSize: '20px'}} contentEditable suppressContentEditableWarning>
+                              {trendArrow(analysis?.trend)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Charts Section */}
+              <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
+                <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Performance Charts</h2>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px'}}>
+                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
+                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>Spend by Campaign</h3>
+                    <canvas id="spendChart" style={{maxHeight: '300px'}}></canvas>
+                  </div>
+                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
+                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>CTR by Campaign</h3>
+                    <canvas id="ctrChart" style={{maxHeight: '300px'}}></canvas>
+                  </div>
+                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
+                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>Clicks by Campaign</h3>
+                    <canvas id="clicksChart" style={{maxHeight: '300px'}}></canvas>
+                  </div>
+                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
+                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>Impressions by Campaign</h3>
+                    <canvas id="impressionsChart" style={{maxHeight: '300px'}}></canvas>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommendations per Campaign */}
+              <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
+                <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Optimization Recommendations</h2>
+                {report.campaignAnalysis?.map((analysis, i) => {
+                  const name = campaignNameMap?.[String(analysis.id)] || `Campaign ${analysis.id}`;
+                  return (
+                    <div key={i} style={{background: '#f9f9f9', borderLeft: '4px solid #2196F3', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
+                      <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}} contentEditable suppressContentEditableWarning>
+                        {name} <span style={{fontSize: '12px', color: '#999', fontFamily: 'monospace'}}>(ID: {analysis.id})</span>
+                      </h4>
+                      <ul style={{listStyle: 'none', padding: 0}}>
+                        {analysis.recommendations?.map((rec, j) => (
+                          <li key={j} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
+                            <span style={{position: 'absolute', left: 0, color: '#2196F3'}}>→</span>
+                            {rec}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Key Insights */}
+              <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
+                <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Key Insights & Action Items</h2>
+
+                <div style={{background: '#f9f9f9', borderLeft: '4px solid #4caf50', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
+                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>🎯 Top Performers</h4>
+                  <ul style={{listStyle: 'none', padding: 0}}>
+                    {report.topPerformers?.map((item, i) => (
+                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
+                        <span style={{position: 'absolute', left: 0, color: '#4caf50'}}>→</span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div style={{background: '#f9f9f9', borderLeft: '4px solid #ff9800', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
+                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>⚠️ Areas for Improvement</h4>
+                  <ul style={{listStyle: 'none', padding: 0}}>
+                    {report.areasForImprovement?.map((item, i) => (
+                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
+                        <span style={{position: 'absolute', left: 0, color: '#ff9800'}}>→</span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div style={{background: '#f9f9f9', borderLeft: '4px solid #2196F3', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
+                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>💡 Strategic Recommendations</h4>
+                  <ul style={{listStyle: 'none', padding: 0}}>
+                    {report.strategicRecommendations?.map((item, i) => (
+                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
+                        <span style={{position: 'absolute', left: 0, color: '#2196F3'}}>→</span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div style={{background: '#f9f9f9', borderLeft: '4px solid #ff5252', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
+                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>🚀 Immediate Next Steps</h4>
+                  <ul style={{listStyle: 'none', padding: 0}}>
+                    {report.immediateActions?.map((item, i) => (
+                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
+                        <span style={{position: 'absolute', left: 0, color: '#ff5252'}}>→</span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {report.budgetRecommendation && (
+                  <div style={{background: '#e8f5e9', borderLeft: '4px solid #4caf50', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
+                    <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>💰 Budget Recommendation</h4>
+                    <p style={{color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>{report.budgetRecommendation}</p>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        ) : null}
+
+        {/* Chart init script injected after render */}
+        {report && metrics?.topCampaigns?.length > 0 && (
+          <ChartRenderer campaigns={metrics.topCampaigns} campaignNameMap={campaignNameMap} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChartRenderer({ campaigns, campaignNameMap }) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    script.onload = () => {
+      const labels = campaigns.map(c => campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`);
+      const truncate = (s) => s.length > 25 ? s.substring(0, 25) + '...' : s;
+      const shortLabels = labels.map(truncate);
+
+      const chartConfig = (id, data, label, color) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el._chart) el._chart.destroy();
+        el._chart = new window.Chart(el, {
+          type: 'bar',
+          data: {
+            labels: shortLabels,
+            datasets: [{ label, data, backgroundColor: color }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true } }
+          }
+        });
+      };
+
+      chartConfig('spendChart', campaigns.map(c => c.spent), 'Spend', '#2196F3');
+      chartConfig('ctrChart', campaigns.map(c => parseFloat(c.ctr)), 'CTR %', '#4caf50');
+      chartConfig('clicksChart', campaigns.map(c => c.clicks), 'Clicks', '#ff9800');
+      chartConfig('impressionsChart', campaigns.map(c => c.impressions), 'Impressions', '#9c27b0');
+    };
+    document.head.appendChild(script);
+
+    return () => { document.head.removeChild(script); };
+  }, [campaigns]);
+
+  return null;
+}
+
+function generateFullHTML(reportResult, reportData, currentRange, previousRange, campaignNameMap) {
+  const report = reportResult?.report;
+  const metrics = reportResult?.metrics;
+  const campaigns = metrics?.topCampaigns || [];
+
+  const statusColor = (s) => s === 'critical' ? '#ff5252' : s === 'warning' ? '#ff9800' : '#4caf50';
+  const trendArrow = (t) => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
+  const perfBadge = (p) => p?.includes('above') ? '✅ Above Benchmark' : p?.includes('below') ? '❌ Below Benchmark' : '➖ At Benchmark';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Campaign Optimization Summary</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f4fbff;padding:20px;line-height:1.6}
+.container{max-width:1200px;margin:0 auto;background:white;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.1);overflow:hidden}
+header{background:#0e1034;color:white;padding:30px}
+header h1{font-size:28px;margin-bottom:10px}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;padding:30px}
+.summary-card{background:white;border:1px solid #e0e0e0;border-radius:8px;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
+.summary-card h3{font-size:12px;color:#666;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px}
+.summary-card .value{font-size:28px;font-weight:bold;color:#0e1034;margin-bottom:5px}
+.summary-card .subtext{font-size:13px;color:#999}
+section{padding:30px;border-top:1px solid #e0e0e0}
+section h2{font-size:22px;margin-bottom:20px;color:#0e1034}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:12px;border-bottom:1px solid #e0e0e0}
+th{background:#f5f5f5;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#666}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.chart-box{padding:20px;background:white;border:1px solid #e0e0e0;border-radius:8px}
+.chart-box h3{margin-bottom:15px;color:#0e1034;font-size:16px}
+canvas{max-height:280px!important}
+.rec-box{background:#f9f9f9;padding:15px;margin:10px 0;border-radius:4px}
+.rec-box ul{list-style:none;padding:0}
+.rec-box li{padding:5px 0 5px 20px;position:relative;color:#444;font-size:14px}
+.exec-summary{padding:20px 30px;background:#f0f4ff;border-bottom:1px solid #e0e0e0;font-size:14px;color:#333;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>📊 Campaign Optimization Summary</h1>
+<p><strong>Report Period:</strong> ${currentRange.start} to ${currentRange.end} | <strong>Compare Period:</strong> ${previousRange.start} to ${previousRange.end}</p>
+</header>
+<div class="exec-summary">${report?.executiveSummary || ''}</div>
+<div class="summary-grid">
+${[
+  { label: 'Total Spend', value: metrics?.current?.spent?.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2}), sub: `vs ${metrics?.previous?.spent?.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2})} prev` },
+  { label: 'Impressions', value: metrics?.current?.impressions?.toLocaleString(), sub: `${report?.keyMetrics?.impressionsChange || ''} vs previous` },
+  { label: 'Clicks', value: metrics?.current?.clicks?.toLocaleString(), sub: `${report?.keyMetrics?.clicksChange || ''} vs previous` },
+  { label: 'CTR', value: `${metrics?.current?.ctr?.toFixed(2)}%`, sub: `${report?.keyMetrics?.ctrChange || ''} vs previous` },
+  { label: 'CPL', value: metrics?.current?.cpl?.toFixed(2), sub: `${report?.keyMetrics?.cplChange || ''} vs previous` },
+  { label: 'Total Leads', value: metrics?.current?.leads, sub: `vs ${metrics?.previous?.leads} prev period` },
+].map(c => `<div class="summary-card"><h3>${c.label}</h3><div class="value">${c.value}</div><div class="subtext">${c.sub}</div></div>`).join('')}
+</div>
+<section>
+<h2>Campaign Performance Comparison</h2>
+<table>
+<thead><tr><th>Campaign</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spent</th><th>Leads</th><th>CPL</th><th>Performance</th><th>Trend</th></tr></thead>
+<tbody>
+${campaigns.map((c, i) => {
+  const analysis = report?.campaignAnalysis?.find(a => String(a.id) === String(c.id));
+  const name = campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`;
+  return `<tr style="background:${i%2===0?'white':'#fafafa'}">
+<td><strong>${name}</strong><br/><span style="font-size:11px;color:#999;font-family:monospace">ID: ${c.id}</span></td>
+<td>${c.impressions.toLocaleString()}</td>
+<td>${c.clicks.toLocaleString()}</td>
+<td>${c.ctr}%</td>
+<td>${c.spent.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+<td>${c.leads||0}</td>
+<td>${c.leads>0?(c.spent/c.leads).toFixed(2):'—'}</td>
+<td style="color:${statusColor(analysis?.status)}">${perfBadge(analysis?.performance)}</td>
+<td style="font-size:20px">${trendArrow(analysis?.trend)}</td>
+</tr>`;
+}).join('')}
+</tbody>
+</table>
+</section>
+<section>
+<h2>Performance Charts</h2>
+<div class="chart-grid">
+<div class="chart-box"><h3>Spend by Campaign</h3><canvas id="spendChart"></canvas></div>
+<div class="chart-box"><h3>CTR by Campaign</h3><canvas id="ctrChart"></canvas></div>
+<div class="chart-box"><h3>Clicks by Campaign</h3><canvas id="clicksChart"></canvas></div>
+<div class="chart-box"><h3>Impressions by Campaign</h3><canvas id="impressionsChart"></canvas></div>
+</div>
+</section>
+<section>
+<h2>Optimization Recommendations</h2>
+${report?.campaignAnalysis?.map(a => {
+  const name = campaignNameMap?.[String(a.id)] || `Campaign ${a.id}`;
+  return `<div class="rec-box" style="border-left:4px solid #2196F3">
+<h4 style="color:#0e1034;margin-bottom:10px;font-size:15px">${name} <span style="font-size:11px;color:#999">(ID: ${a.id})</span></h4>
+<ul>${a.recommendations?.map(r => `<li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;color:#2196F3">→</span>${r}</li>`).join('')}</ul>
+</div>`;
+}).join('')}
+</section>
+<section>
+<h2>Key Insights & Action Items</h2>
+${[
+  {title:'🎯 Top Performers', items: report?.topPerformers, color:'#4caf50'},
+  {title:'⚠️ Areas for Improvement', items: report?.areasForImprovement, color:'#ff9800'},
+  {title:'💡 Strategic Recommendations', items: report?.strategicRecommendations, color:'#2196F3'},
+  {title:'🚀 Immediate Next Steps', items: report?.immediateActions, color:'#ff5252'},
+].map(s => `<div class="rec-box" style="border-left:4px solid ${s.color}">
+<h4 style="color:#0e1034;margin-bottom:10px;font-size:15px">${s.title}</h4>
+<ul>${(s.items||[]).map(i => `<li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;color:${s.color}">→</span>${i}</li>`).join('')}</ul>
+</div>`).join('')}
+${report?.budgetRecommendation ? `<div class="rec-box" style="border-left:4px solid #4caf50;background:#e8f5e9">
+<h4 style="color:#0e1034;margin-bottom:10px;font-size:15px">💰 Budget Recommendation</h4>
+<p style="color:#444;font-size:14px">${report.budgetRecommendation}</p>
+</div>` : ''}
+</section>
+</div>
+<script>
+const labels = ${JSON.stringify(campaigns.map(c => { const n = campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`; return n.length > 25 ? n.substring(0,25)+'...' : n; }))};
+function makeChart(id, data, label, color) {
+  new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: { labels, datasets: [{ label, data, backgroundColor: color }] },
+    options: { responsive:true, maintainAspectRatio:true, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}} }
+  });
+}
+makeChart('spendChart', ${JSON.stringify(campaigns.map(c => c.spent))}, 'Spend', '#2196F3');
+makeChart('ctrChart', ${JSON.stringify(campaigns.map(c => parseFloat(c.ctr)))}, 'CTR %', '#4caf50');
+makeChart('clicksChart', ${JSON.stringify(campaigns.map(c => c.clicks))}, 'Clicks', '#ff9800');
+makeChart('impressionsChart', ${JSON.stringify(campaigns.map(c => c.impressions))}, 'Impressions', '#9c27b0');
+<\/script>
+</body>
+</html>`;
+}
+
 export default function Dashboard() {
   const { data: session, status } = useSession();
 
@@ -275,7 +705,7 @@ export default function Dashboard() {
   const [manualBudget, setManualBudget] = useState('');
 
   const [showReport, setShowReport] = useState(false);
-  const [reportContent, setReportContent] = useState('');
+  const [reportResult, setReportResult] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
 
   const [currentRange, setCurrentRange] = useState({
@@ -305,12 +735,8 @@ export default function Dashboard() {
   }, [selectedAccounts]);
 
   useEffect(() => {
-    if (selectedCampaigns.length > 0) {
-      loadAds();
-      setSelectedAds([]);
-    } else {
-      setAds([]); setSelectedAds([]);
-    }
+    if (selectedCampaigns.length > 0) { loadAds(); setSelectedAds([]); }
+    else { setAds([]); setSelectedAds([]); }
   }, [selectedCampaigns]);
 
   useEffect(() => {
@@ -328,8 +754,7 @@ export default function Dashboard() {
     setLoadingGroups(true);
     try {
       const res = await fetch('/api/campaigngroups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountIds: selectedAccounts })
       });
       if (res.ok) setCampaignGroups(await res.json());
@@ -341,8 +766,7 @@ export default function Dashboard() {
     setLoadingCampaigns(true);
     try {
       const res = await fetch('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountIds: selectedAccounts })
       });
       if (res.ok) setCampaigns(await res.json());
@@ -354,8 +778,7 @@ export default function Dashboard() {
     setLoadingAds(true);
     try {
       const res = await fetch('/api/ads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaignIds: selectedCampaigns })
       });
       if (res.ok) setAds(await res.json());
@@ -367,8 +790,7 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const res = await fetch('/api/analytics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accountIds: selectedAccounts,
           campaignGroupIds: selectedCampaignGroups.length > 0 ? selectedCampaignGroups : null,
@@ -386,27 +808,23 @@ export default function Dashboard() {
     if (!reportData) return;
     setGeneratingReport(true);
     setShowReport(true);
-    setReportContent('');
+    setReportResult(null);
     try {
       const res = await fetch('/api/report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           current: reportData.current,
           previous: reportData.previous,
+          topCampaigns: reportData.topCampaigns,
           topAds: reportData.topAds,
           budgetPacing: reportData.budgetPacing,
           currentRange, previousRange, selectedCampaigns, exchangeRate
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setReportContent(data.report);
-      } else {
-        setReportContent('Failed to generate report. Please try again.');
-      }
+      if (res.ok) setReportResult(await res.json());
+      else setReportResult({ error: 'Failed to generate report.' });
     } catch (err) {
-      setReportContent('Failed to generate report. Please try again.');
+      setReportResult({ error: 'Failed to generate report.' });
     }
     setGeneratingReport(false);
   }
@@ -429,17 +847,9 @@ export default function Dashboard() {
 
   return (
     <>
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          body { background: #0f172a !important; }
-          @page { margin: 1cm; }
-        }
-      `}</style>
+      <style>{`@media print { .no-print { display: none !important; } body { background: #0f172a !important; } @page { margin: 1cm; } }`}</style>
 
       <div className="min-h-screen bg-slate-900">
-
-        {/* Header */}
         <div className="bg-slate-800 border-b border-slate-700 shadow-lg">
           <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
             <div>
@@ -471,99 +881,60 @@ export default function Dashboard() {
         <div className="max-w-screen-2xl mx-auto p-6">
           <div className="grid grid-cols-12 gap-6">
 
-            {/* Sidebar */}
             <div className="col-span-3 space-y-3 no-print">
-
-              {/* Step 1 */}
               <div className="flex items-center gap-2 px-1">
                 <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
                 <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Account</span>
               </div>
-              <SidebarSection
-                title="Accounts"
-                loading={false}
-                items={filteredAccounts}
-                selectedIds={selectedAccounts}
-                onToggle={toggle(setSelectedAccounts)}
+              <SidebarSection title="Accounts" loading={false} items={filteredAccounts}
+                selectedIds={selectedAccounts} onToggle={toggle(setSelectedAccounts)}
                 onSelectAll={() => setSelectedAccounts(filteredAccounts.map(a => a.id))}
-                onClear={() => setSelectedAccounts([])}
-                searchValue={accountSearch}
-                onSearchChange={setAccountSearch}
-                searchPlaceholder="Search by name or ID..."
-                emptyMessage="No accounts found"
-                accentColor="blue"
-              />
+                onClear={() => setSelectedAccounts([])} searchValue={accountSearch}
+                onSearchChange={setAccountSearch} searchPlaceholder="Search by name or ID..."
+                emptyMessage="No accounts found" accentColor="blue" />
 
               {selectedAccounts.length > 0 && (
                 <>
-                  {/* Step 2 */}
                   <div className="flex items-center gap-2 px-1 pt-2">
                     <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Campaign Group</span>
                   </div>
-                  <SidebarSection
-                    title="Campaign Groups"
-                    loading={loadingGroups}
-                    items={filteredGroups}
-                    selectedIds={selectedCampaignGroups}
-                    onToggle={toggle(setSelectedCampaignGroups)}
+                  <SidebarSection title="Campaign Groups" loading={loadingGroups} items={filteredGroups}
+                    selectedIds={selectedCampaignGroups} onToggle={toggle(setSelectedCampaignGroups)}
                     onSelectAll={() => setSelectedCampaignGroups(filteredGroups.map(g => g.id))}
-                    onClear={() => setSelectedCampaignGroups([])}
-                    searchValue={campaignGroupSearch}
-                    onSearchChange={setCampaignGroupSearch}
-                    searchPlaceholder="Search by name or ID..."
-                    emptyMessage="No campaign groups found"
-                    accentColor="purple"
-                  />
+                    onClear={() => setSelectedCampaignGroups([])} searchValue={campaignGroupSearch}
+                    onSearchChange={setCampaignGroupSearch} searchPlaceholder="Search by name or ID..."
+                    emptyMessage="No campaign groups found" accentColor="purple" />
 
-                  {/* Step 3 */}
                   <div className="flex items-center gap-2 px-1 pt-2">
                     <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Campaign / Ad Set</span>
                   </div>
-                  <SidebarSection
-                    title="Campaigns"
-                    loading={loadingCampaigns}
-                    items={filteredCampaigns}
-                    selectedIds={selectedCampaigns}
-                    onToggle={toggle(setSelectedCampaigns)}
+                  <SidebarSection title="Campaigns" loading={loadingCampaigns} items={filteredCampaigns}
+                    selectedIds={selectedCampaigns} onToggle={toggle(setSelectedCampaigns)}
                     onSelectAll={() => setSelectedCampaigns(filteredCampaigns.map(c => c.id))}
-                    onClear={() => setSelectedCampaigns([])}
-                    searchValue={campaignSearch}
-                    onSearchChange={setCampaignSearch}
-                    searchPlaceholder="Search by name or ID..."
-                    emptyMessage="No campaigns found"
-                    accentColor="emerald"
-                  />
+                    onClear={() => setSelectedCampaigns([])} searchValue={campaignSearch}
+                    onSearchChange={setCampaignSearch} searchPlaceholder="Search by name or ID..."
+                    emptyMessage="No campaigns found" accentColor="emerald" />
                 </>
               )}
 
-              {/* Step 4 */}
               {selectedCampaigns.length > 0 && (
                 <>
                   <div className="flex items-center gap-2 px-1 pt-2">
                     <span className="w-5 h-5 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</span>
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Ads</span>
                   </div>
-                  <SidebarSection
-                    title="Ads"
-                    loading={loadingAds}
-                    items={filteredAds}
-                    selectedIds={selectedAds}
-                    onToggle={toggle(setSelectedAds)}
+                  <SidebarSection title="Ads" loading={loadingAds} items={filteredAds}
+                    selectedIds={selectedAds} onToggle={toggle(setSelectedAds)}
                     onSelectAll={() => setSelectedAds(filteredAds.map(a => a.id))}
-                    onClear={() => setSelectedAds([])}
-                    searchValue={adSearch}
-                    onSearchChange={setAdSearch}
-                    searchPlaceholder="Search by name or ID..."
-                    emptyMessage="No ads found"
-                    accentColor="orange"
-                  />
+                    onClear={() => setSelectedAds([])} searchValue={adSearch}
+                    onSearchChange={setAdSearch} searchPlaceholder="Search by name or ID..."
+                    emptyMessage="No ads found" accentColor="orange" />
                 </>
               )}
             </div>
 
-            {/* Main Content */}
             <div className="col-span-9 print:col-span-12">
               {!reportData ? (
                 <div className="bg-slate-800 rounded-xl p-12 text-center border border-slate-700">
@@ -573,7 +944,6 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Active filter pills */}
                   <div className="flex gap-2 mb-4 flex-wrap no-print">
                     <span className="px-3 py-1 bg-blue-900 border border-blue-700 rounded-full text-xs text-blue-300 font-medium">
                       {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''}
@@ -595,7 +965,6 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  {/* Controls Bar */}
                   <div className="bg-slate-800 rounded-xl p-4 mb-6 border border-slate-700 no-print">
                     <div className="flex flex-wrap items-center gap-4">
                       <div>
@@ -622,13 +991,11 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Print header */}
                   <div className="hidden print:block mb-6">
                     <h2 className="text-xl font-bold text-white">LinkedIn Campaign Report</h2>
                     <p className="text-slate-400 text-sm">Period: {currentRange.start} to {currentRange.end} | Compare: {previousRange.start} to {previousRange.end}</p>
                   </div>
 
-                  {/* Metrics Grid */}
                   <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
                     <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
                     <div className="grid grid-cols-4 gap-4">
@@ -645,99 +1012,39 @@ export default function Dashboard() {
                         { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp },
                         { label: 'Engagements', key: 'engagements', format: 'number', icon: Users },
                       ].map(metric => (
-                        <MetricCard key={metric.key}
-                          label={metric.label}
+                        <MetricCard key={metric.key} label={metric.label}
                           current={reportData.current[metric.key]}
                           previous={reportData.previous[metric.key]}
-                          format={metric.format}
-                          icon={metric.icon} />
+                          format={metric.format} icon={metric.icon} />
                       ))}
                     </div>
                   </div>
 
-                  {/* Top Performers */}
                   <div className="grid grid-cols-2 gap-6 mb-6">
-                    <TopPerformingBlock
-                      title="Top Campaigns"
-                      items={reportData.topCampaigns}
-                      accountId={primaryAccountId}
-                      type="campaign"
-                      nameMap={campaignNameMap}
-                    />
-                    <TopPerformingBlock
-                      title="Top Ads"
-                      items={reportData.topAds}
-                      accountId={primaryAccountId}
-                      type="ad"
-                      nameMap={adNameMap}
-                    />
+                    <TopPerformingBlock title="Top Campaigns" items={reportData.topCampaigns}
+                      accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
+                    <TopPerformingBlock title="Top Ads" items={reportData.topAds}
+                      accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
                   </div>
 
-                  {/* Budget Pacing */}
-                  <BudgetPacingCard
-                    pacing={reportData.budgetPacing}
-                    manualBudget={manualBudget}
-                    onBudgetChange={setManualBudget}
-                  />
+                  <BudgetPacingCard pacing={reportData.budgetPacing}
+                    manualBudget={manualBudget} onBudgetChange={setManualBudget} />
                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* AI Report Modal */}
-        {showReport && (
-          <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center p-6 overflow-y-auto no-print">
-            <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-4xl my-6">
-              <div className="flex justify-between items-center p-6 border-b border-slate-700">
-                <h2 className="text-xl font-bold text-white">✦ AI Campaign Report</h2>
-                <div className="flex gap-3">
-                  {reportContent && !generatingReport && (
-                    <button onClick={() => {
-                      const blob = new Blob([reportContent], { type: 'text/plain' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `linkedin-report-${currentRange.start}-${currentRange.end}.txt`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 font-medium">
-                      ↓ Download
-                    </button>
-                  )}
-                  <button onClick={() => setShowReport(false)}
-                    className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-500">
-                    Close
-                  </button>
-                </div>
-              </div>
-              <div className="p-6">
-                {generatingReport ? (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <RefreshCw className="w-12 h-12 text-purple-500 animate-spin mb-4" />
-                    <p className="text-white font-semibold text-lg">Analyzing your campaigns...</p>
-                    <p className="text-slate-400 text-sm mt-2">This may take 15-30 seconds</p>
-                  </div>
-                ) : (
-                  <div className="max-w-none">
-                    {reportContent.split('\n').map((line, i) => {
-                      if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold text-white mt-6 mb-3 border-b border-slate-700 pb-2">{line.replace('## ', '')}</h2>;
-                      if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-bold text-slate-200 mt-4 mb-2">{line.replace('### ', '')}</h3>;
-                      if (line.startsWith('- **')) {
-                        const match = line.match(/- \*\*(.+?)\*\*(.*)$/);
-                        if (match) return <p key={i} className="text-slate-300 mb-2 ml-4">• <strong className="text-white">{match[1]}</strong>{match[2]}</p>;
-                      }
-                      if (line.startsWith('- ')) return <p key={i} className="text-slate-300 mb-1 ml-4">• {line.replace('- ', '')}</p>;
-                      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="text-white font-semibold mt-3 mb-1">{line.replace(/\*\*/g, '')}</p>;
-                      if (line.trim() === '') return <div key={i} className="mb-2" />;
-                      return <p key={i} className="text-slate-300 mb-2 leading-relaxed">{line}</p>;
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <AIReportModal
+          show={showReport}
+          onClose={() => setShowReport(false)}
+          generatingReport={generatingReport}
+          reportData={reportData}
+          reportResult={reportResult}
+          currentRange={currentRange}
+          previousRange={previousRange}
+          campaignNameMap={campaignNameMap}
+        />
       </div>
     </>
   );
@@ -773,7 +1080,6 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
 
   const budget = parseFloat(manualBudget) || 0;
   const pacingPercent = budget > 0 ? Math.min((pacing.spent / budget * 100), 100).toFixed(1) : 0;
-
   const now = new Date();
   const todayDate = now.getDate();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -785,14 +1091,14 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
       <div className="grid grid-cols-3 gap-6 mb-6">
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget</label>
-          <input type="number" placeholder="Enter budget..."
-            value={manualBudget} onChange={e => onBudgetChange(e.target.value)}
+          <input type="number" placeholder="Enter budget..." value={manualBudget}
+            onChange={e => onBudgetChange(e.target.value)}
             className="no-print w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500" />
-          {manualBudget && <div className="hidden print:block text-2xl font-bold text-white">{parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>}
+          {manualBudget && <div className="hidden print:block text-2xl font-bold text-white">{parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2})}</div>}
         </div>
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Spent</label>
-          <div className="text-2xl font-bold text-white">{pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          <div className="text-2xl font-bold text-white">{pacing.spent.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2})}</div>
         </div>
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Pacing</label>
@@ -801,7 +1107,6 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
           </div>
         </div>
       </div>
-
       {budget > 0 && (
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-2">
@@ -814,7 +1119,6 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
           </div>
         </div>
       )}
-
       <div>
         <div className="flex justify-between text-sm mb-2">
           <span className="font-medium text-slate-300">Time Progress</span>

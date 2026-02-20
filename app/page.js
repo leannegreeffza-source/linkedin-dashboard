@@ -230,7 +230,7 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
   const reportRef = useRef(null);
 
   function downloadHTML() {
-    if (!reportRef.current) return;
+    if (!reportResult) return;
     const html = generateFullHTML(reportResult, reportData, currentRange, previousRange, campaignNameMap);
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
@@ -269,7 +269,6 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
     <div className="fixed inset-0 bg-black/80 z-50 flex items-start justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-6xl my-4 overflow-hidden shadow-2xl">
 
-        {/* Modal toolbar */}
         <div className="flex justify-between items-center px-6 py-3 bg-gray-100 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-gray-700">✦ AI Campaign Report</span>
@@ -299,7 +298,6 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
           <div ref={reportRef} style={{fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", background: '#f4fbff', padding: '20px'}}>
             <div style={{maxWidth: '100%', margin: '0 auto', background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', overflow: 'hidden'}}>
 
-              {/* Header */}
               <div style={{background: '#0e1034', color: 'white', padding: '30px'}} contentEditable suppressContentEditableWarning>
                 <h1 style={{fontSize: '28px', marginBottom: '10px', margin: 0}}>📊 Campaign Optimization Summary</h1>
                 <p style={{opacity: 0.9, fontSize: '14px', marginTop: '10px'}}>
@@ -308,19 +306,17 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
                 </p>
               </div>
 
-              {/* Executive Summary */}
               <div style={{padding: '20px 30px', background: '#f0f4ff', borderBottom: '1px solid #e0e0e0'}}>
                 <p style={{fontSize: '14px', color: '#333', lineHeight: 1.7}} contentEditable suppressContentEditableWarning>
                   {report.executiveSummary}
                 </p>
               </div>
 
-              {/* Summary Cards */}
               <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', padding: '30px'}}>
                 {[
                   { label: 'Total Spend', value: metrics?.current?.spent?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), sub: `vs ${metrics?.previous?.spent?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} prev` },
-                  { label: 'Total Impressions', value: metrics?.current?.impressions?.toLocaleString(), sub: `${report.keyMetrics?.impressionsChange || ''} vs previous` },
-                  { label: 'Total Clicks', value: metrics?.current?.clicks?.toLocaleString(), sub: `${report.keyMetrics?.clicksChange || ''} vs previous` },
+                  { label: 'Impressions', value: metrics?.current?.impressions?.toLocaleString(), sub: `${report.keyMetrics?.impressionsChange || ''} vs previous` },
+                  { label: 'Clicks', value: metrics?.current?.clicks?.toLocaleString(), sub: `${report.keyMetrics?.clicksChange || ''} vs previous` },
                   { label: 'CTR', value: `${metrics?.current?.ctr?.toFixed(2)}%`, sub: `${report.keyMetrics?.ctrChange || ''} vs previous` },
                   { label: 'CPL', value: metrics?.current?.cpl?.toFixed(2), sub: `${report.keyMetrics?.cplChange || ''} vs previous` },
                   { label: 'Total Leads', value: metrics?.current?.leads, sub: `vs ${metrics?.previous?.leads} prev period` },
@@ -333,7 +329,6 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
                 ))}
               </div>
 
-              {/* Campaign Performance Table */}
               <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
                 <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Campaign Performance Comparison</h2>
                 <div style={{overflowX: 'auto'}}>
@@ -379,30 +374,23 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
                 </div>
               </div>
 
-              {/* Charts Section */}
               <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
                 <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Performance Charts</h2>
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px'}}>
-                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
-                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>Spend by Campaign</h3>
-                    <canvas id="spendChart" style={{maxHeight: '300px'}}></canvas>
-                  </div>
-                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
-                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>CTR by Campaign</h3>
-                    <canvas id="ctrChart" style={{maxHeight: '300px'}}></canvas>
-                  </div>
-                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
-                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>Clicks by Campaign</h3>
-                    <canvas id="clicksChart" style={{maxHeight: '300px'}}></canvas>
-                  </div>
-                  <div style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
-                    <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>Impressions by Campaign</h3>
-                    <canvas id="impressionsChart" style={{maxHeight: '300px'}}></canvas>
-                  </div>
+                  {[
+                    { id: 'spendChart', title: 'Spend by Campaign' },
+                    { id: 'ctrChart', title: 'CTR by Campaign' },
+                    { id: 'clicksChart', title: 'Clicks by Campaign' },
+                    { id: 'impressionsChart', title: 'Impressions by Campaign' },
+                  ].map(chart => (
+                    <div key={chart.id} style={{padding: '20px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px'}}>
+                      <h3 style={{marginBottom: '15px', color: '#0e1034', fontSize: '16px'}}>{chart.title}</h3>
+                      <canvas id={chart.id} style={{maxHeight: '300px'}}></canvas>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Recommendations per Campaign */}
               <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
                 <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Optimization Recommendations</h2>
                 {report.campaignAnalysis?.map((analysis, i) => {
@@ -425,57 +413,27 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
                 })}
               </div>
 
-              {/* Key Insights */}
               <div style={{padding: '30px', borderTop: '1px solid #e0e0e0'}}>
                 <h2 style={{fontSize: '22px', marginBottom: '20px', color: '#0e1034'}}>Key Insights & Action Items</h2>
 
-                <div style={{background: '#f9f9f9', borderLeft: '4px solid #4caf50', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
-                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>🎯 Top Performers</h4>
-                  <ul style={{listStyle: 'none', padding: 0}}>
-                    {report.topPerformers?.map((item, i) => (
-                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
-                        <span style={{position: 'absolute', left: 0, color: '#4caf50'}}>→</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div style={{background: '#f9f9f9', borderLeft: '4px solid #ff9800', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
-                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>⚠️ Areas for Improvement</h4>
-                  <ul style={{listStyle: 'none', padding: 0}}>
-                    {report.areasForImprovement?.map((item, i) => (
-                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
-                        <span style={{position: 'absolute', left: 0, color: '#ff9800'}}>→</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div style={{background: '#f9f9f9', borderLeft: '4px solid #2196F3', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
-                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>💡 Strategic Recommendations</h4>
-                  <ul style={{listStyle: 'none', padding: 0}}>
-                    {report.strategicRecommendations?.map((item, i) => (
-                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
-                        <span style={{position: 'absolute', left: 0, color: '#2196F3'}}>→</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div style={{background: '#f9f9f9', borderLeft: '4px solid #ff5252', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
-                  <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>🚀 Immediate Next Steps</h4>
-                  <ul style={{listStyle: 'none', padding: 0}}>
-                    {report.immediateActions?.map((item, i) => (
-                      <li key={i} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
-                        <span style={{position: 'absolute', left: 0, color: '#ff5252'}}>→</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {[
+                  { title: '🎯 Top Performers', items: report.topPerformers, color: '#4caf50' },
+                  { title: '⚠️ Areas for Improvement', items: report.areasForImprovement, color: '#ff9800' },
+                  { title: '💡 Strategic Recommendations', items: report.strategicRecommendations, color: '#2196F3' },
+                  { title: '🚀 Immediate Next Steps', items: report.immediateActions, color: '#ff5252' },
+                ].map((section, si) => (
+                  <div key={si} style={{background: '#f9f9f9', borderLeft: `4px solid ${section.color}`, padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
+                    <h4 style={{color: '#0e1034', marginBottom: '10px', fontSize: '15px'}}>{section.title}</h4>
+                    <ul style={{listStyle: 'none', padding: 0}}>
+                      {section.items?.map((item, j) => (
+                        <li key={j} style={{padding: '5px 0', paddingLeft: '20px', position: 'relative', color: '#444', fontSize: '14px'}} contentEditable suppressContentEditableWarning>
+                          <span style={{position: 'absolute', left: 0, color: section.color}}>→</span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
 
                 {report.budgetRecommendation && (
                   <div style={{background: '#e8f5e9', borderLeft: '4px solid #4caf50', padding: '15px', margin: '10px 0', borderRadius: '4px'}}>
@@ -484,12 +442,10 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
                   </div>
                 )}
               </div>
-
             </div>
           </div>
         ) : null}
 
-        {/* Chart init script injected after render */}
         {report && metrics?.topCampaigns?.length > 0 && (
           <ChartRenderer campaigns={metrics.topCampaigns} campaignNameMap={campaignNameMap} />
         )}
@@ -501,44 +457,35 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
 function ChartRenderer({ campaigns, campaignNameMap }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
     script.onload = () => {
-      const labels = campaigns.map(c => campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`);
-      const truncate = (s) => s.length > 25 ? s.substring(0, 25) + '...' : s;
-      const shortLabels = labels.map(truncate);
-
-      const chartConfig = (id, data, label, color) => {
+      const labels = campaigns.map(c => {
+        const n = campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`;
+        return n.length > 25 ? n.substring(0, 25) + '...' : n;
+      });
+      const makeChart = (id, data, label, color) => {
         const el = document.getElementById(id);
         if (!el) return;
         if (el._chart) el._chart.destroy();
         el._chart = new window.Chart(el, {
           type: 'bar',
-          data: {
-            labels: shortLabels,
-            datasets: [{ label, data, backgroundColor: color }]
-          },
+          data: { labels, datasets: [{ label, data, backgroundColor: color }] },
           options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: true, indexAxis: 'y',
             plugins: { legend: { display: false } },
             scales: { x: { beginAtZero: true } }
           }
         });
       };
-
-      chartConfig('spendChart', campaigns.map(c => c.spent), 'Spend', '#2196F3');
-      chartConfig('ctrChart', campaigns.map(c => parseFloat(c.ctr)), 'CTR %', '#4caf50');
-      chartConfig('clicksChart', campaigns.map(c => c.clicks), 'Clicks', '#ff9800');
-      chartConfig('impressionsChart', campaigns.map(c => c.impressions), 'Impressions', '#9c27b0');
+      makeChart('spendChart', campaigns.map(c => c.spent), 'Spend', '#2196F3');
+      makeChart('ctrChart', campaigns.map(c => parseFloat(c.ctr)), 'CTR %', '#4caf50');
+      makeChart('clicksChart', campaigns.map(c => c.clicks), 'Clicks', '#ff9800');
+      makeChart('impressionsChart', campaigns.map(c => c.impressions), 'Impressions', '#9c27b0');
     };
     document.head.appendChild(script);
-
-    return () => { document.head.removeChild(script); };
+    return () => { try { document.head.removeChild(script); } catch(e) {} };
   }, [campaigns]);
-
   return null;
 }
 
@@ -546,7 +493,6 @@ function generateFullHTML(reportResult, reportData, currentRange, previousRange,
   const report = reportResult?.report;
   const metrics = reportResult?.metrics;
   const campaigns = metrics?.topCampaigns || [];
-
   const statusColor = (s) => s === 'critical' ? '#ff5252' : s === 'warning' ? '#ff9800' : '#4caf50';
   const trendArrow = (t) => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
   const perfBadge = (p) => p?.includes('above') ? '✅ Above Benchmark' : p?.includes('below') ? '❌ Below Benchmark' : '➖ At Benchmark';
@@ -563,11 +509,12 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f4fbff;
 .container{max-width:1200px;margin:0 auto;background:white;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.1);overflow:hidden}
 header{background:#0e1034;color:white;padding:30px}
 header h1{font-size:28px;margin-bottom:10px}
+.exec{padding:20px 30px;background:#f0f4ff;border-bottom:1px solid #e0e0e0;font-size:14px;color:#333;line-height:1.7}
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;padding:30px}
-.summary-card{background:white;border:1px solid #e0e0e0;border-radius:8px;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
-.summary-card h3{font-size:12px;color:#666;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px}
-.summary-card .value{font-size:28px;font-weight:bold;color:#0e1034;margin-bottom:5px}
-.summary-card .subtext{font-size:13px;color:#999}
+.card{background:white;border:1px solid #e0e0e0;border-radius:8px;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
+.card h3{font-size:12px;color:#666;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px}
+.card .value{font-size:28px;font-weight:bold;color:#0e1034;margin-bottom:5px}
+.card .sub{font-size:13px;color:#999}
 section{padding:30px;border-top:1px solid #e0e0e0}
 section h2{font-size:22px;margin-bottom:20px;color:#0e1034}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -577,10 +524,10 @@ th{background:#f5f5f5;font-weight:600;font-size:11px;text-transform:uppercase;le
 .chart-box{padding:20px;background:white;border:1px solid #e0e0e0;border-radius:8px}
 .chart-box h3{margin-bottom:15px;color:#0e1034;font-size:16px}
 canvas{max-height:280px!important}
-.rec-box{background:#f9f9f9;padding:15px;margin:10px 0;border-radius:4px}
-.rec-box ul{list-style:none;padding:0}
-.rec-box li{padding:5px 0 5px 20px;position:relative;color:#444;font-size:14px}
-.exec-summary{padding:20px 30px;background:#f0f4ff;border-bottom:1px solid #e0e0e0;font-size:14px;color:#333;line-height:1.7}
+.rec{background:#f9f9f9;padding:15px;margin:10px 0;border-radius:4px}
+.rec h4{color:#0e1034;margin-bottom:10px;font-size:15px}
+.rec ul{list-style:none;padding:0}
+.rec li{padding:5px 0 5px 20px;position:relative;color:#444;font-size:14px}
 </style>
 </head>
 <body>
@@ -589,39 +536,34 @@ canvas{max-height:280px!important}
 <h1>📊 Campaign Optimization Summary</h1>
 <p><strong>Report Period:</strong> ${currentRange.start} to ${currentRange.end} | <strong>Compare Period:</strong> ${previousRange.start} to ${previousRange.end}</p>
 </header>
-<div class="exec-summary">${report?.executiveSummary || ''}</div>
+<div class="exec">${report?.executiveSummary || ''}</div>
 <div class="summary-grid">
 ${[
-  { label: 'Total Spend', value: metrics?.current?.spent?.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2}), sub: `vs ${metrics?.previous?.spent?.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2})} prev` },
-  { label: 'Impressions', value: metrics?.current?.impressions?.toLocaleString(), sub: `${report?.keyMetrics?.impressionsChange || ''} vs previous` },
-  { label: 'Clicks', value: metrics?.current?.clicks?.toLocaleString(), sub: `${report?.keyMetrics?.clicksChange || ''} vs previous` },
-  { label: 'CTR', value: `${metrics?.current?.ctr?.toFixed(2)}%`, sub: `${report?.keyMetrics?.ctrChange || ''} vs previous` },
-  { label: 'CPL', value: metrics?.current?.cpl?.toFixed(2), sub: `${report?.keyMetrics?.cplChange || ''} vs previous` },
+  { label: 'Total Spend', value: metrics?.current?.spent?.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}), sub: `vs ${metrics?.previous?.spent?.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} prev` },
+  { label: 'Impressions', value: metrics?.current?.impressions?.toLocaleString(), sub: `${report?.keyMetrics?.impressionsChange||''} vs previous` },
+  { label: 'Clicks', value: metrics?.current?.clicks?.toLocaleString(), sub: `${report?.keyMetrics?.clicksChange||''} vs previous` },
+  { label: 'CTR', value: `${metrics?.current?.ctr?.toFixed(2)}%`, sub: `${report?.keyMetrics?.ctrChange||''} vs previous` },
+  { label: 'CPL', value: metrics?.current?.cpl?.toFixed(2), sub: `${report?.keyMetrics?.cplChange||''} vs previous` },
   { label: 'Total Leads', value: metrics?.current?.leads, sub: `vs ${metrics?.previous?.leads} prev period` },
-].map(c => `<div class="summary-card"><h3>${c.label}</h3><div class="value">${c.value}</div><div class="subtext">${c.sub}</div></div>`).join('')}
+].map(c => `<div class="card"><h3>${c.label}</h3><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('')}
 </div>
 <section>
 <h2>Campaign Performance Comparison</h2>
 <table>
-<thead><tr><th>Campaign</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spent</th><th>Leads</th><th>CPL</th><th>Performance</th><th>Trend</th></tr></thead>
+<thead><tr>${['Campaign','Impressions','Clicks','CTR','Spent','Leads','CPL','Performance','Trend'].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
 <tbody>
-${campaigns.map((c, i) => {
-  const analysis = report?.campaignAnalysis?.find(a => String(a.id) === String(c.id));
-  const name = campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`;
+${campaigns.map((c,i)=>{
+  const a=report?.campaignAnalysis?.find(x=>String(x.id)===String(c.id));
+  const name=campaignNameMap?.[String(c.id)]||`Campaign ${c.id}`;
   return `<tr style="background:${i%2===0?'white':'#fafafa'}">
 <td><strong>${name}</strong><br/><span style="font-size:11px;color:#999;font-family:monospace">ID: ${c.id}</span></td>
-<td>${c.impressions.toLocaleString()}</td>
-<td>${c.clicks.toLocaleString()}</td>
-<td>${c.ctr}%</td>
+<td>${c.impressions.toLocaleString()}</td><td>${c.clicks.toLocaleString()}</td><td>${c.ctr}%</td>
 <td>${c.spent.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-<td>${c.leads||0}</td>
-<td>${c.leads>0?(c.spent/c.leads).toFixed(2):'—'}</td>
-<td style="color:${statusColor(analysis?.status)}">${perfBadge(analysis?.performance)}</td>
-<td style="font-size:20px">${trendArrow(analysis?.trend)}</td>
-</tr>`;
+<td>${c.leads||0}</td><td>${c.leads>0?(c.spent/c.leads).toFixed(2):'—'}</td>
+<td style="color:${statusColor(a?.status)}">${perfBadge(a?.performance)}</td>
+<td style="font-size:20px">${trendArrow(a?.trend)}</td></tr>`;
 }).join('')}
-</tbody>
-</table>
+</tbody></table>
 </section>
 <section>
 <h2>Performance Charts</h2>
@@ -634,47 +576,38 @@ ${campaigns.map((c, i) => {
 </section>
 <section>
 <h2>Optimization Recommendations</h2>
-${report?.campaignAnalysis?.map(a => {
-  const name = campaignNameMap?.[String(a.id)] || `Campaign ${a.id}`;
-  return `<div class="rec-box" style="border-left:4px solid #2196F3">
-<h4 style="color:#0e1034;margin-bottom:10px;font-size:15px">${name} <span style="font-size:11px;color:#999">(ID: ${a.id})</span></h4>
-<ul>${a.recommendations?.map(r => `<li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;color:#2196F3">→</span>${r}</li>`).join('')}</ul>
+${(report?.campaignAnalysis||[]).map(a=>{
+  const name=campaignNameMap?.[String(a.id)]||`Campaign ${a.id}`;
+  return `<div class="rec" style="border-left:4px solid #2196F3">
+<h4>${name} <span style="font-size:11px;color:#999">(ID: ${a.id})</span></h4>
+<ul>${(a.recommendations||[]).map(r=>`<li><span style="position:absolute;left:0;color:#2196F3">→</span>${r}</li>`).join('')}</ul>
 </div>`;
 }).join('')}
 </section>
 <section>
 <h2>Key Insights & Action Items</h2>
 ${[
-  {title:'🎯 Top Performers', items: report?.topPerformers, color:'#4caf50'},
-  {title:'⚠️ Areas for Improvement', items: report?.areasForImprovement, color:'#ff9800'},
-  {title:'💡 Strategic Recommendations', items: report?.strategicRecommendations, color:'#2196F3'},
-  {title:'🚀 Immediate Next Steps', items: report?.immediateActions, color:'#ff5252'},
-].map(s => `<div class="rec-box" style="border-left:4px solid ${s.color}">
-<h4 style="color:#0e1034;margin-bottom:10px;font-size:15px">${s.title}</h4>
-<ul>${(s.items||[]).map(i => `<li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;color:${s.color}">→</span>${i}</li>`).join('')}</ul>
+  {title:'🎯 Top Performers',items:report?.topPerformers,color:'#4caf50'},
+  {title:'⚠️ Areas for Improvement',items:report?.areasForImprovement,color:'#ff9800'},
+  {title:'💡 Strategic Recommendations',items:report?.strategicRecommendations,color:'#2196F3'},
+  {title:'🚀 Immediate Next Steps',items:report?.immediateActions,color:'#ff5252'},
+].map(s=>`<div class="rec" style="border-left:4px solid ${s.color}">
+<h4>${s.title}</h4>
+<ul>${(s.items||[]).map(i=>`<li><span style="position:absolute;left:0;color:${s.color}">→</span>${i}</li>`).join('')}</ul>
 </div>`).join('')}
-${report?.budgetRecommendation ? `<div class="rec-box" style="border-left:4px solid #4caf50;background:#e8f5e9">
-<h4 style="color:#0e1034;margin-bottom:10px;font-size:15px">💰 Budget Recommendation</h4>
-<p style="color:#444;font-size:14px">${report.budgetRecommendation}</p>
-</div>` : ''}
+${report?.budgetRecommendation?`<div class="rec" style="border-left:4px solid #4caf50;background:#e8f5e9">
+<h4>💰 Budget Recommendation</h4><p style="color:#444;font-size:14px">${report.budgetRecommendation}</p></div>`:''}
 </section>
 </div>
 <script>
-const labels = ${JSON.stringify(campaigns.map(c => { const n = campaignNameMap?.[String(c.id)] || `Campaign ${c.id}`; return n.length > 25 ? n.substring(0,25)+'...' : n; }))};
-function makeChart(id, data, label, color) {
-  new Chart(document.getElementById(id), {
-    type: 'bar',
-    data: { labels, datasets: [{ label, data, backgroundColor: color }] },
-    options: { responsive:true, maintainAspectRatio:true, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}} }
-  });
-}
-makeChart('spendChart', ${JSON.stringify(campaigns.map(c => c.spent))}, 'Spend', '#2196F3');
-makeChart('ctrChart', ${JSON.stringify(campaigns.map(c => parseFloat(c.ctr)))}, 'CTR %', '#4caf50');
-makeChart('clicksChart', ${JSON.stringify(campaigns.map(c => c.clicks))}, 'Clicks', '#ff9800');
-makeChart('impressionsChart', ${JSON.stringify(campaigns.map(c => c.impressions))}, 'Impressions', '#9c27b0');
+const labels=${JSON.stringify(campaigns.map(c=>{const n=campaignNameMap?.[String(c.id)]||`Campaign ${c.id}`;return n.length>25?n.substring(0,25)+'...':n;}))};
+function mc(id,data,label,color){new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{label,data,backgroundColor:color}]},options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}})}
+mc('spendChart',${JSON.stringify(campaigns.map(c=>c.spent))},'Spend','#2196F3');
+mc('ctrChart',${JSON.stringify(campaigns.map(c=>parseFloat(c.ctr)))},'CTR %','#4caf50');
+mc('clicksChart',${JSON.stringify(campaigns.map(c=>c.clicks))},'Clicks','#ff9800');
+mc('impressionsChart',${JSON.stringify(campaigns.map(c=>c.impressions))},'Impressions','#9c27b0');
 <\/script>
-</body>
-</html>`;
+</body></html>`;
 }
 
 export default function Dashboard() {
@@ -829,6 +762,65 @@ export default function Dashboard() {
     setGeneratingReport(false);
   }
 
+  function exportToCSV() {
+    if (!reportData) return;
+    const { current, previous, topCampaigns } = reportData;
+
+    const rows = [
+      ['LinkedIn Campaign Dashboard Export'],
+      [`Generated: ${new Date().toLocaleDateString()}`],
+      [],
+      ['SUMMARY METRICS', 'CURRENT PERIOD', 'PREVIOUS PERIOD', 'CHANGE %'],
+      ['Period', `${currentRange.start} to ${currentRange.end}`, `${previousRange.start} to ${previousRange.end}`, ''],
+      ['Impressions', current.impressions, previous.impressions,
+        previous.impressions > 0 ? (((current.impressions - previous.impressions) / previous.impressions) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Clicks', current.clicks, previous.clicks,
+        previous.clicks > 0 ? (((current.clicks - previous.clicks) / previous.clicks) * 100).toFixed(1) + '%' : 'N/A'],
+      ['CTR (%)', current.ctr.toFixed(2), previous.ctr.toFixed(2),
+        previous.ctr > 0 ? (((current.ctr - previous.ctr) / previous.ctr) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Spend', current.spent.toFixed(2), previous.spent.toFixed(2),
+        previous.spent > 0 ? (((current.spent - previous.spent) / previous.spent) * 100).toFixed(1) + '%' : 'N/A'],
+      ['CPM', current.cpm.toFixed(2), previous.cpm.toFixed(2),
+        previous.cpm > 0 ? (((current.cpm - previous.cpm) / previous.cpm) * 100).toFixed(1) + '%' : 'N/A'],
+      ['CPC', current.cpc.toFixed(2), previous.cpc.toFixed(2),
+        previous.cpc > 0 ? (((current.cpc - previous.cpc) / previous.cpc) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Leads', current.leads, previous.leads,
+        previous.leads > 0 ? (((current.leads - previous.leads) / previous.leads) * 100).toFixed(1) + '%' : 'N/A'],
+      ['CPL', current.cpl.toFixed(2), previous.cpl.toFixed(2),
+        previous.cpl > 0 ? (((current.cpl - previous.cpl) / previous.cpl) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Engagements', current.engagements, previous.engagements,
+        previous.engagements > 0 ? (((current.engagements - previous.engagements) / previous.engagements) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Engagement Rate (%)', current.engagementRate.toFixed(2), previous.engagementRate.toFixed(2),
+        previous.engagementRate > 0 ? (((current.engagementRate - previous.engagementRate) / previous.engagementRate) * 100).toFixed(1) + '%' : 'N/A'],
+      [],
+      ['TOP CAMPAIGNS', 'ID', 'IMPRESSIONS', 'CLICKS', 'CTR (%)', 'SPENT', 'LEADS', 'CPL'],
+      ...(topCampaigns || []).map(c => [
+        campaignNameMap[String(c.id)] || `Campaign ${c.id}`,
+        c.id,
+        c.impressions,
+        c.clicks,
+        c.ctr,
+        c.spent.toFixed(2),
+        c.leads || 0,
+        c.leads > 0 ? (c.spent / c.leads).toFixed(2) : '—'
+      ]),
+    ];
+
+    const csv = rows
+      .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `linkedin-dashboard-${currentRange.start}-${currentRange.end}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setTimeout(() => window.open('https://sheets.new', '_blank'), 500);
+  }
+
   const campaignNameMap = Object.fromEntries(campaigns.map(c => [String(c.id), c.name]));
   const adNameMap = Object.fromEntries(ads.map(a => [String(a.id), a.name]));
   const primaryAccountId = selectedAccounts[0];
@@ -850,6 +842,8 @@ export default function Dashboard() {
       <style>{`@media print { .no-print { display: none !important; } body { background: #0f172a !important; } @page { margin: 1cm; } }`}</style>
 
       <div className="min-h-screen bg-slate-900">
+
+        {/* Header */}
         <div className="bg-slate-800 border-b border-slate-700 shadow-lg">
           <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center">
             <div>
@@ -863,6 +857,10 @@ export default function Dashboard() {
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm flex items-center gap-2 disabled:opacity-50">
                     {generatingReport ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>✦</span>}
                     {generatingReport ? 'Generating...' : 'AI Report'}
+                  </button>
+                  <button onClick={exportToCSV}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-sm flex items-center gap-2">
+                    <span>📊</span> Google Sheets
                   </button>
                   <button onClick={() => window.print()}
                     className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold text-sm">
@@ -881,7 +879,9 @@ export default function Dashboard() {
         <div className="max-w-screen-2xl mx-auto p-6">
           <div className="grid grid-cols-12 gap-6">
 
+            {/* Sidebar */}
             <div className="col-span-3 space-y-3 no-print">
+
               <div className="flex items-center gap-2 px-1">
                 <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
                 <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Account</span>
@@ -935,6 +935,7 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* Main Content */}
             <div className="col-span-9 print:col-span-12">
               {!reportData ? (
                 <div className="bg-slate-800 rounded-xl p-12 text-center border border-slate-700">
@@ -944,6 +945,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
+                  {/* Active filter pills */}
                   <div className="flex gap-2 mb-4 flex-wrap no-print">
                     <span className="px-3 py-1 bg-blue-900 border border-blue-700 rounded-full text-xs text-blue-300 font-medium">
                       {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''}
@@ -965,6 +967,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
+                  {/* Controls Bar */}
                   <div className="bg-slate-800 rounded-xl p-4 mb-6 border border-slate-700 no-print">
                     <div className="flex flex-wrap items-center gap-4">
                       <div>
@@ -991,11 +994,13 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Print header */}
                   <div className="hidden print:block mb-6">
                     <h2 className="text-xl font-bold text-white">LinkedIn Campaign Report</h2>
                     <p className="text-slate-400 text-sm">Period: {currentRange.start} to {currentRange.end} | Compare: {previousRange.start} to {previousRange.end}</p>
                   </div>
 
+                  {/* Metrics Grid */}
                   <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
                     <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
                     <div className="grid grid-cols-4 gap-4">
@@ -1020,6 +1025,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Top Performers */}
                   <div className="grid grid-cols-2 gap-6 mb-6">
                     <TopPerformingBlock title="Top Campaigns" items={reportData.topCampaigns}
                       accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
@@ -1027,6 +1033,7 @@ export default function Dashboard() {
                       accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
                   </div>
 
+                  {/* Budget Pacing */}
                   <BudgetPacingCard pacing={reportData.budgetPacing}
                     manualBudget={manualBudget} onBudgetChange={setManualBudget} />
                 </>
@@ -1077,7 +1084,6 @@ function MetricCard({ label, current, previous, format, icon: Icon }) {
 
 function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
   if (!pacing) return null;
-
   const budget = parseFloat(manualBudget) || 0;
   const pacingPercent = budget > 0 ? Math.min((pacing.spent / budget * 100), 100).toFixed(1) : 0;
   const now = new Date();
@@ -1094,11 +1100,11 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
           <input type="number" placeholder="Enter budget..." value={manualBudget}
             onChange={e => onBudgetChange(e.target.value)}
             className="no-print w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500" />
-          {manualBudget && <div className="hidden print:block text-2xl font-bold text-white">{parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2})}</div>}
+          {manualBudget && <div className="hidden print:block text-2xl font-bold text-white">{parseFloat(manualBudget).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>}
         </div>
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Spent</label>
-          <div className="text-2xl font-bold text-white">{pacing.spent.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div className="text-2xl font-bold text-white">{pacing.spent.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
         </div>
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Pacing</label>

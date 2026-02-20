@@ -139,6 +139,10 @@ export default function Dashboard() {
   const [exchangeRate, setExchangeRate] = useState(18.5);
   const [manualBudget, setManualBudget] = useState('');
 
+  const [showReport, setShowReport] = useState(false);
+  const [reportContent, setReportContent] = useState('');
+  const [generatingReport, setGeneratingReport] = useState(false);
+
   const [currentRange, setCurrentRange] = useState({
     start: new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -204,6 +208,39 @@ export default function Dashboard() {
     setLoading(false);
   }
 
+  async function generateReport() {
+    if (!reportData) return;
+    setGeneratingReport(true);
+    setShowReport(true);
+    setReportContent('');
+    try {
+      const res = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current: reportData.current,
+          previous: reportData.previous,
+          topAds: reportData.topAds,
+          budgetPacing: reportData.budgetPacing,
+          currentRange,
+          previousRange,
+          selectedCampaigns,
+          exchangeRate
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReportContent(data.report);
+      } else {
+        setReportContent('Failed to generate report. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      setReportContent('Failed to generate report. Please try again.');
+    }
+    setGeneratingReport(false);
+  }
+
   const filteredAccounts = accounts.filter(a =>
     !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase())
   );
@@ -225,7 +262,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Print styles injected into head */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
@@ -245,11 +281,20 @@ export default function Dashboard() {
             </div>
             <div className="flex gap-3 no-print">
               {reportData && (
-                <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold text-sm flex items-center gap-2">
-                  ↓ Export PDF
-                </button>
+                <>
+                  <button
+                    onClick={generateReport}
+                    disabled={generatingReport}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm flex items-center gap-2 disabled:opacity-50">
+                    {generatingReport ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>✦</span>}
+                    {generatingReport ? 'Generating...' : 'AI Report'}
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold text-sm">
+                    ↓ Export PDF
+                  </button>
+                </>
               )}
               <button onClick={() => signOut()}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm">
@@ -262,7 +307,7 @@ export default function Dashboard() {
         <div className="max-w-screen-2xl mx-auto p-6">
           <div className="grid grid-cols-12 gap-6">
 
-            {/* Sidebar - hidden when printing */}
+            {/* Sidebar */}
             <div className="col-span-3 space-y-4 no-print">
 
               {/* Account Selector */}
@@ -353,7 +398,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Main Content - full width when printing */}
+            {/* Main Content */}
             <div className="col-span-9 print:col-span-12">
               {!reportData ? (
                 <div className="bg-slate-800 rounded-xl p-12 text-center border border-slate-700">
@@ -363,7 +408,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Controls Bar - hidden when printing */}
+                  {/* Controls Bar */}
                   <div className="bg-slate-800 rounded-xl p-4 mb-6 border border-slate-700 no-print">
                     <div className="flex flex-wrap items-center gap-4">
                       <div>
@@ -390,12 +435,11 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Print header - only visible when printing */}
+                  {/* Print header */}
                   <div className="hidden print:block mb-6">
                     <h2 className="text-xl font-bold text-white">LinkedIn Campaign Report</h2>
                     <p className="text-slate-400 text-sm">
-                      Period: {currentRange.start} – {currentRange.end} | 
-                      Compare: {previousRange.start} – {previousRange.end}
+                      Period: {currentRange.start} to {currentRange.end} | Compare: {previousRange.start} to {previousRange.end}
                     </p>
                   </div>
 
@@ -466,6 +510,78 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* AI Report Modal */}
+        {showReport && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center p-6 overflow-y-auto no-print">
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-4xl my-6">
+              <div className="flex justify-between items-center p-6 border-b border-slate-700">
+                <h2 className="text-xl font-bold text-white">✦ AI Campaign Report</h2>
+                <div className="flex gap-3">
+                  {reportContent && !generatingReport && (
+                    <button
+                      onClick={() => {
+                        const blob = new Blob([reportContent], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `linkedin-report-${currentRange.start}-${currentRange.end}.txt`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 font-medium">
+                      ↓ Download
+                    </button>
+                  )}
+                  <button onClick={() => setShowReport(false)}
+                    className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-500">
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="p-6">
+                {generatingReport ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <RefreshCw className="w-12 h-12 text-purple-500 animate-spin mb-4" />
+                    <p className="text-white font-semibold text-lg">Analyzing your campaigns...</p>
+                    <p className="text-slate-400 text-sm mt-2">This may take 15-30 seconds</p>
+                  </div>
+                ) : (
+                  <div className="max-w-none">
+                    {reportContent.split('\n').map((line, i) => {
+                      if (line.startsWith('## ')) return (
+                        <h2 key={i} className="text-xl font-bold text-white mt-6 mb-3 border-b border-slate-700 pb-2">
+                          {line.replace('## ', '')}
+                        </h2>
+                      );
+                      if (line.startsWith('### ')) return (
+                        <h3 key={i} className="text-lg font-bold text-slate-200 mt-4 mb-2">
+                          {line.replace('### ', '')}
+                        </h3>
+                      );
+                      if (line.startsWith('- **')) {
+                        const match = line.match(/- \*\*(.+?)\*\*(.*)$/);
+                        if (match) return (
+                          <p key={i} className="text-slate-300 mb-2 ml-4">
+                            • <strong className="text-white">{match[1]}</strong>{match[2]}
+                          </p>
+                        );
+                      }
+                      if (line.startsWith('- ')) return (
+                        <p key={i} className="text-slate-300 mb-1 ml-4">• {line.replace('- ', '')}</p>
+                      );
+                      if (line.startsWith('**') && line.endsWith('**')) return (
+                        <p key={i} className="text-white font-semibold mt-3 mb-1">{line.replace(/\*\*/g, '')}</p>
+                      );
+                      if (line.trim() === '') return <div key={i} className="mb-2" />;
+                      return <p key={i} className="text-slate-300 mb-2 leading-relaxed">{line}</p>;
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -517,7 +633,9 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
             className="no-print w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500"
           />
           {manualBudget && (
-            <div className="print:block hidden text-2xl font-bold text-white">{parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            <div className="hidden print:block text-2xl font-bold text-white">
+              {parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
           )}
         </div>
         <div>

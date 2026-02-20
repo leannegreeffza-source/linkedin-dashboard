@@ -371,8 +371,6 @@ export default function Dashboard() {
 
             {/* Sidebar */}
             <div className="col-span-3 space-y-4 no-print">
-
-              {/* Accounts */}
               <SidebarSection
                 title="Accounts"
                 loading={false}
@@ -387,7 +385,6 @@ export default function Dashboard() {
                 emptyMessage="No accounts found"
               />
 
-              {/* Campaigns */}
               {selectedAccounts.length > 0 && (
                 <SidebarSection
                   title="Campaigns"
@@ -404,7 +401,6 @@ export default function Dashboard() {
                 />
               )}
 
-              {/* Ads */}
               {selectedCampaigns.length > 0 && (
                 <SidebarSection
                   title="Ads"
@@ -432,7 +428,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Active filter indicator */}
+                  {/* Active filter pills */}
                   <div className="flex gap-2 mb-4 flex-wrap no-print">
                     <span className="px-3 py-1 bg-blue-900 border border-blue-700 rounded-full text-xs text-blue-300 font-medium">
                       {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''}
@@ -656,7 +652,12 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
 
   const budget = parseFloat(manualBudget) || 0;
   const pacingPercent = budget > 0 ? Math.min((pacing.spent / budget * 100), 100).toFixed(1) : 0;
-  const dayProgress = pacing.daysTotal > 0 ? (pacing.daysElapsed / pacing.daysTotal * 100).toFixed(1) : 0;
+
+  // Time progress = today's date vs total days in current month
+  const now = new Date();
+  const todayDate = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayProgress = ((todayDate / daysInMonth) * 100).toFixed(1);
 
   return (
     <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
@@ -703,7 +704,7 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
       <div>
         <div className="flex justify-between text-sm mb-2">
           <span className="font-medium text-slate-300">Time Progress</span>
-          <span className="text-slate-400">{pacing.daysElapsed}/{pacing.daysTotal} days ({dayProgress}%)</span>
+          <span className="text-slate-400">{todayDate}/{daysInMonth} days ({dayProgress}%)</span>
         </div>
         <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
           <div className="h-full bg-slate-500 transition-all rounded-full" style={{ width: `${dayProgress}%` }} />

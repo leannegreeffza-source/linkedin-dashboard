@@ -11,8 +11,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { accountIds, campaignIds, adIds, currentRange, previousRange } = await request.json();
-    console.log('Analytics - accounts:', accountIds, 'campaigns:', campaignIds, 'ads:', adIds);
+    const { accountIds, campaignGroupIds, campaignIds, adIds, currentRange, previousRange } = await request.json();
 
     const headers = {
       'Authorization': `Bearer ${token.accessToken}`,
@@ -20,15 +19,16 @@ export async function POST(request) {
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
-    const currentData = await fetchPeriodData(accountIds, campaignIds, adIds, currentRange, headers);
-    const previousData = await fetchPeriodData(accountIds, campaignIds, adIds, previousRange, headers);
+    const currentData = await fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds, currentRange, headers);
+    const previousData = await fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds, previousRange, headers);
 
     const current = calculateMetrics(currentData);
     const previous = calculateMetrics(previousData);
-    const topAds = getTopAds(currentData.creatives, 5);
+    const topCampaigns = getTopItems(currentData.campaignBreakdown, 5);
+    const topAds = getTopItems(currentData.adBreakdown, 5);
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
 
-    return NextResponse.json({ current, previous, topAds, budgetPacing });
+    return NextResponse.json({ current, previous, topCampaigns, topAds, budgetPacing });
 
   } catch (error) {
     console.error('Analytics error:', error);
@@ -36,77 +36,100 @@ export async function POST(request) {
   }
 }
 
-async function fetchPeriodData(accountIds, campaignIds, adIds, dateRange, headers) {
+async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds, dateRange, headers) {
   const [sy, sm, sd] = dateRange.start.split('-');
   const [ey, em, ed] = dateRange.end.split('-');
 
   let allData = {
     impressions: 0, clicks: 0, spend: 0,
-    landingPageClicks: 0, leads: 0, likes: 0,
-    comments: 0, shares: 0, follows: 0,
-    otherEngagements: 0, creatives: [],
+    leads: 0, likes: 0, comments: 0,
+    shares: 0, follows: 0, otherEngagements: 0,
+    campaignBreakdown: [],
+    adBreakdown: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
   const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,pivotValues';
 
-  // Priority: ads selected > campaigns selected > accounts
   if (adIds && adIds.length > 0) {
-    // Query by specific ads (creatives)
-    const creativeUrns = adIds
-      .map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`))
-      .join(',');
-
+    const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
     const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&creatives=List(${creativeUrns})&fields=${fields}`;
-    console.log('Analytics by ads:', url);
-
     const res = await fetch(url, { headers });
-    console.log('Analytics status:', res.status);
-
     if (res.ok) {
       const data = await res.json();
-      console.log('Elements:', data.elements?.length);
-      aggregateData(allData, data.elements || []);
-    } else {
-      console.error('Analytics failed:', await res.text());
+      aggregateData(allData, data.elements || [], 'ad');
     }
 
   } else if (campaignIds && campaignIds.length > 0) {
-    // Query by campaigns
-    const campaignUrns = campaignIds
-      .map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`))
-      .join(',');
+    const campaignUrns = campaignIds.map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`)).join(',');
 
-    const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
-    console.log('Analytics by campaigns:', url);
+    // Get campaign-level breakdown
+    const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
+    const campRes = await fetch(campUrl, { headers });
+    if (campRes.ok) {
+      const data = await campRes.json();
+      aggregateData(allData, data.elements || [], 'campaign');
+    }
 
-    const res = await fetch(url, { headers });
-    console.log('Analytics status:', res.status);
+    // Also get ad-level breakdown
+    const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
+    const adRes = await fetch(adUrl, { headers });
+    if (adRes.ok) {
+      const data = await adRes.json();
+      data.elements?.forEach(el => {
+        const urn = el.pivotValues?.[0];
+        if (urn) {
+          allData.adBreakdown.push({
+            id: urn.split(':').pop(),
+            impressions: el.impressions || 0,
+            clicks: el.clicks || 0,
+            spent: parseFloat(el.costInLocalCurrency || 0),
+            leads: el.oneClickLeads || 0,
+          });
+        }
+      });
+    }
 
-    if (res.ok) {
-      const data = await res.json();
-      console.log('Elements:', data.elements?.length);
-      aggregateData(allData, data.elements || []);
-    } else {
-      console.error('Analytics failed:', await res.text());
+  } else if (campaignGroupIds && campaignGroupIds.length > 0) {
+    // Filter by campaign group — get campaigns in those groups then query by campaign
+    for (const groupId of campaignGroupIds) {
+      const groupUrn = encodeURIComponent(`urn:li:sponsoredCampaignGroup:${groupId}`);
+      const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaignGroups=List(${groupUrn})&fields=${fields}`;
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        aggregateData(allData, data.elements || [], 'campaign');
+      }
     }
 
   } else {
-    // Query by accounts
+    // Account level
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
-      const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
-      console.log('Analytics by account:', url);
 
-      const res = await fetch(url, { headers });
-      console.log('Analytics status:', res.status);
+      const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
+      const campRes = await fetch(campUrl, { headers });
+      if (campRes.ok) {
+        const data = await campRes.json();
+        aggregateData(allData, data.elements || [], 'campaign');
+      }
 
-      if (res.ok) {
-        const data = await res.json();
-        console.log('Elements:', data.elements?.length);
-        aggregateData(allData, data.elements || []);
-      } else {
-        console.error('Analytics failed:', await res.text());
+      const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
+      const adRes = await fetch(adUrl, { headers });
+      if (adRes.ok) {
+        const data = await adRes.json();
+        data.elements?.forEach(el => {
+          const urn = el.pivotValues?.[0];
+          if (urn) {
+            allData.adBreakdown.push({
+              id: urn.split(':').pop(),
+              impressions: el.impressions || 0,
+              clicks: el.clicks || 0,
+              spent: parseFloat(el.costInLocalCurrency || 0),
+              leads: el.oneClickLeads || 0,
+            });
+          }
+        });
       }
     }
   }
@@ -114,9 +137,9 @@ async function fetchPeriodData(accountIds, campaignIds, adIds, dateRange, header
   return allData;
 }
 
-function aggregateData(allData, elements) {
+function aggregateData(allData, elements, type) {
   elements.forEach(el => {
-    const pivotUrn = el.pivotValues?.[0];
+    const urn = el.pivotValues?.[0];
     allData.impressions += el.impressions || 0;
     allData.clicks += el.clicks || 0;
     allData.spend += parseFloat(el.costInLocalCurrency || 0);
@@ -127,12 +150,14 @@ function aggregateData(allData, elements) {
     allData.follows += el.follows || 0;
     allData.otherEngagements += el.otherEngagements || 0;
 
-    if (pivotUrn) {
-      allData.creatives.push({
-        id: pivotUrn.split(':').pop(),
+    if (urn && type === 'campaign') {
+      allData.campaignBreakdown.push({
+        id: urn.split(':').pop(),
         impressions: el.impressions || 0,
         clicks: el.clicks || 0,
         spent: parseFloat(el.costInLocalCurrency || 0),
+        leads: el.oneClickLeads || 0,
+        ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
       });
     }
   });
@@ -141,7 +166,6 @@ function aggregateData(allData, elements) {
 function calculateMetrics(data) {
   const { impressions, clicks, spend, leads, likes, comments, shares, follows } = data;
   const engagements = clicks + likes + comments + shares + follows;
-
   return {
     impressions, clicks,
     ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
@@ -156,17 +180,10 @@ function calculateMetrics(data) {
   };
 }
 
-function getTopAds(creatives, count) {
-  return creatives
+function getTopItems(items, count) {
+  return [...items]
     .sort((a, b) => b.impressions - a.impressions)
-    .slice(0, count)
-    .map(c => ({
-      id: c.id,
-      impressions: c.impressions,
-      clicks: c.clicks,
-      ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0.00',
-      spent: c.spent
-    }));
+    .slice(0, count);
 }
 
 function calculateBudgetPacing(data, dateRange) {

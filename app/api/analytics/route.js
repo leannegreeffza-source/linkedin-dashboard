@@ -7,13 +7,12 @@ export const maxDuration = 60;
 export async function POST(request) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-
     if (!token?.accessToken) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { accountIds, campaignIds, currentRange, previousRange } = await request.json();
-    console.log('Analytics request - accounts:', accountIds, 'campaigns:', campaignIds);
+    const { accountIds, campaignIds, adIds, currentRange, previousRange } = await request.json();
+    console.log('Analytics - accounts:', accountIds, 'campaigns:', campaignIds, 'ads:', adIds);
 
     const headers = {
       'Authorization': `Bearer ${token.accessToken}`,
@@ -21,15 +20,13 @@ export async function POST(request) {
       'X-RestLi-Protocol-Version': '2.0.0',
     };
 
-    const currentData = await fetchPeriodData(accountIds, campaignIds, currentRange, headers);
-    const previousData = await fetchPeriodData(accountIds, campaignIds, previousRange, headers);
+    const currentData = await fetchPeriodData(accountIds, campaignIds, adIds, currentRange, headers);
+    const previousData = await fetchPeriodData(accountIds, campaignIds, adIds, previousRange, headers);
 
     const current = calculateMetrics(currentData);
     const previous = calculateMetrics(previousData);
     const topAds = getTopAds(currentData.creatives, 5);
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
-
-    console.log('Current metrics:', current);
 
     return NextResponse.json({ current, previous, topAds, budgetPacing });
 
@@ -39,31 +36,43 @@ export async function POST(request) {
   }
 }
 
-async function fetchPeriodData(accountIds, campaignIds, dateRange, headers) {
+async function fetchPeriodData(accountIds, campaignIds, adIds, dateRange, headers) {
   const [sy, sm, sd] = dateRange.start.split('-');
   const [ey, em, ed] = dateRange.end.split('-');
 
   let allData = {
-    impressions: 0,
-    clicks: 0,
-    spend: 0,
-    landingPageClicks: 0,
-    leads: 0,
-    likes: 0,
-    comments: 0,
-    shares: 0,
-    follows: 0,
-    otherEngagements: 0,
-    creatives: [],
+    impressions: 0, clicks: 0, spend: 0,
+    landingPageClicks: 0, leads: 0, likes: 0,
+    comments: 0, shares: 0, follows: 0,
+    otherEngagements: 0, creatives: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
-
-  // Fields - removed externalWebsiteConversions and landingPageClicks as they are unreliable
-  // Using oneClickLeads for native LinkedIn lead gen forms instead
   const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,pivotValues';
 
-  if (campaignIds && campaignIds.length > 0) {
+  // Priority: ads selected > campaigns selected > accounts
+  if (adIds && adIds.length > 0) {
+    // Query by specific ads (creatives)
+    const creativeUrns = adIds
+      .map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`))
+      .join(',');
+
+    const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&creatives=List(${creativeUrns})&fields=${fields}`;
+    console.log('Analytics by ads:', url);
+
+    const res = await fetch(url, { headers });
+    console.log('Analytics status:', res.status);
+
+    if (res.ok) {
+      const data = await res.json();
+      console.log('Elements:', data.elements?.length);
+      aggregateData(allData, data.elements || []);
+    } else {
+      console.error('Analytics failed:', await res.text());
+    }
+
+  } else if (campaignIds && campaignIds.length > 0) {
+    // Query by campaigns
     const campaignUrns = campaignIds
       .map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`))
       .join(',');
@@ -77,13 +86,13 @@ async function fetchPeriodData(accountIds, campaignIds, dateRange, headers) {
     if (res.ok) {
       const data = await res.json();
       console.log('Elements:', data.elements?.length);
-      if (data.elements?.[0]) console.log('Sample element:', JSON.stringify(data.elements[0]));
       aggregateData(allData, data.elements || []);
     } else {
       console.error('Analytics failed:', await res.text());
     }
 
   } else {
+    // Query by accounts
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
       const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
@@ -95,7 +104,6 @@ async function fetchPeriodData(accountIds, campaignIds, dateRange, headers) {
       if (res.ok) {
         const data = await res.json();
         console.log('Elements:', data.elements?.length);
-        if (data.elements?.[0]) console.log('Sample element:', JSON.stringify(data.elements[0]));
         aggregateData(allData, data.elements || []);
       } else {
         console.error('Analytics failed:', await res.text());
@@ -135,13 +143,12 @@ function calculateMetrics(data) {
   const engagements = clicks + likes + comments + shares + follows;
 
   return {
-    impressions,
-    clicks,
+    impressions, clicks,
     ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
     spent: spend,
     cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
     cpc: clicks > 0 ? spend / clicks : 0,
-    websiteVisits: 0, // Not reliably available via API
+    websiteVisits: 0,
     leads,
     cpl: leads > 0 ? spend / leads : 0,
     engagementRate: impressions > 0 ? (engagements / impressions) * 100 : 0,
@@ -168,6 +175,5 @@ function calculateBudgetPacing(data, dateRange) {
   const today = new Date();
   const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
   const elapsedDays = Math.min(Math.ceil((today - startDate) / (1000 * 60 * 60 * 24)), totalDays);
-
   return { budget: 0, spent: data.spend, daysTotal: totalDays, daysElapsed: elapsedDays };
 }

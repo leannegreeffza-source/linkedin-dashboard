@@ -42,15 +42,15 @@ function DateRangePicker({ value, onChange }) {
   }
   function thisQuarter() {
     const d = new Date(); const q = Math.floor(d.getMonth()/3);
-    const start = new Date(d.getFullYear(), q*3, 1).toISOString().split('T')[0];
-    return { start, end: today() };
+    return { start: new Date(d.getFullYear(), q*3, 1).toISOString().split('T')[0], end: today() };
   }
   function lastQuarter() {
     const d = new Date(); const q = Math.floor(d.getMonth()/3);
     const sq = q === 0 ? 3 : q-1; const yr = q === 0 ? d.getFullYear()-1 : d.getFullYear();
-    const start = new Date(yr, sq*3, 1).toISOString().split('T')[0];
-    const end = new Date(yr, sq*3+3, 0).toISOString().split('T')[0];
-    return { start, end };
+    return {
+      start: new Date(yr, sq*3, 1).toISOString().split('T')[0],
+      end: new Date(yr, sq*3+3, 0).toISOString().split('T')[0]
+    };
   }
 
   function applyPreset(fn) {
@@ -71,10 +71,8 @@ function DateRangePicker({ value, onChange }) {
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm font-medium text-white hover:bg-slate-600"
-      >
+      <button onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm font-medium text-white hover:bg-slate-600">
         <Calendar className="w-4 h-4 text-slate-400" />
         {formatDisplay(value.start, value.end)}
         <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -94,14 +92,12 @@ function DateRangePicker({ value, onChange }) {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Start date</label>
-                <input type="date" value={tempStart}
-                  onChange={e => setTempStart(e.target.value)}
+                <input type="date" value={tempStart} onChange={e => setTempStart(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">End date</label>
-                <input type="date" value={tempEnd}
-                  onChange={e => setTempEnd(e.target.value)}
+                <input type="date" value={tempEnd} onChange={e => setTempEnd(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               </div>
             </div>
@@ -122,6 +118,54 @@ function DateRangePicker({ value, onChange }) {
   );
 }
 
+function SidebarSection({ title, loading, items, selectedIds, onToggle, onSelectAll, onClear, searchValue, onSearchChange, searchPlaceholder, emptyMessage }) {
+  return (
+    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">
+        {title} {loading && <span className="text-slate-400 font-normal text-xs">(loading...)</span>}
+      </h2>
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+        <input type="text" placeholder={searchPlaceholder}
+          value={searchValue} onChange={e => onSearchChange(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
+      </div>
+      <div className="flex gap-2 mb-3">
+        <button onClick={onSelectAll}
+          className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+          All
+        </button>
+        {selectedIds.length > 0 && (
+          <button onClick={onClear}
+            className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
+            Clear ({selectedIds.length})
+          </button>
+        )}
+      </div>
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {items.map(item => (
+          <label key={item.id}
+            className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
+              selectedIds.includes(item.id)
+                ? 'bg-blue-900 border-blue-500 text-white'
+                : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+            }`}>
+            <input type="checkbox" checked={selectedIds.includes(item.id)}
+              onChange={() => onToggle(item.id)} className="w-4 h-4 accent-blue-500" />
+            <div className="min-w-0">
+              <div className="font-medium truncate text-xs">{item.name}</div>
+              <div className="text-xs text-slate-400">ID: {item.id}</div>
+            </div>
+          </label>
+        ))}
+        {items.length === 0 && !loading && (
+          <p className="text-slate-400 text-xs text-center py-4">{emptyMessage}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data: session, status } = useSession();
 
@@ -133,6 +177,11 @@ export default function Dashboard() {
   const [selectedCampaigns, setSelectedCampaigns] = useState([]);
   const [campaignSearch, setCampaignSearch] = useState('');
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+
+  const [ads, setAds] = useState([]);
+  const [selectedAds, setSelectedAds] = useState([]);
+  const [adSearch, setAdSearch] = useState('');
+  const [loadingAds, setLoadingAds] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
@@ -158,16 +207,27 @@ export default function Dashboard() {
     if (selectedAccounts.length > 0) {
       loadCampaigns();
       setSelectedCampaigns([]);
+      setAds([]);
+      setSelectedAds([]);
     } else {
-      setCampaigns([]);
-      setSelectedCampaigns([]);
+      setCampaigns([]); setSelectedCampaigns([]);
+      setAds([]); setSelectedAds([]);
       setReportData(null);
     }
   }, [selectedAccounts]);
 
   useEffect(() => {
+    if (selectedCampaigns.length > 0) {
+      loadAds();
+      setSelectedAds([]);
+    } else {
+      setAds([]); setSelectedAds([]);
+    }
+  }, [selectedCampaigns]);
+
+  useEffect(() => {
     if (selectedAccounts.length > 0) loadAnalytics();
-  }, [selectedCampaigns, currentRange, previousRange]);
+  }, [selectedAds, selectedCampaigns, currentRange, previousRange]);
 
   async function loadAccounts() {
     try {
@@ -189,6 +249,19 @@ export default function Dashboard() {
     setLoadingCampaigns(false);
   }
 
+  async function loadAds() {
+    setLoadingAds(true);
+    try {
+      const res = await fetch('/api/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignIds: selectedCampaigns })
+      });
+      if (res.ok) setAds(await res.json());
+    } catch (err) { console.error(err); }
+    setLoadingAds(false);
+  }
+
   async function loadAnalytics() {
     setLoading(true);
     try {
@@ -198,6 +271,7 @@ export default function Dashboard() {
         body: JSON.stringify({
           accountIds: selectedAccounts,
           campaignIds: selectedCampaigns.length > 0 ? selectedCampaigns : null,
+          adIds: selectedAds.length > 0 ? selectedAds : null,
           currentRange,
           previousRange,
           exchangeRate
@@ -235,26 +309,17 @@ export default function Dashboard() {
         setReportContent('Failed to generate report. Please try again.');
       }
     } catch (err) {
-      console.error(err);
       setReportContent('Failed to generate report. Please try again.');
     }
     setGeneratingReport(false);
   }
 
-  const filteredAccounts = accounts.filter(a =>
-    !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase())
-  );
+  const filteredAccounts = accounts.filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()));
+  const filteredCampaigns = campaigns.filter(c => !campaignSearch || c.name.toLowerCase().includes(campaignSearch.toLowerCase()));
+  const filteredAds = ads.filter(a => !adSearch || a.name.toLowerCase().includes(adSearch.toLowerCase()));
 
-  const filteredCampaigns = campaigns.filter(c =>
-    !campaignSearch || c.name.toLowerCase().includes(campaignSearch.toLowerCase())
-  );
-
-  function toggleAccount(id) {
-    setSelectedAccounts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  }
-
-  function toggleCampaign(id) {
-    setSelectedCampaigns(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  function toggle(setter) {
+    return (id) => setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
   if (status === 'loading') return <LoadingScreen />;
@@ -282,15 +347,12 @@ export default function Dashboard() {
             <div className="flex gap-3 no-print">
               {reportData && (
                 <>
-                  <button
-                    onClick={generateReport}
-                    disabled={generatingReport}
+                  <button onClick={generateReport} disabled={generatingReport}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm flex items-center gap-2 disabled:opacity-50">
                     {generatingReport ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>✦</span>}
                     {generatingReport ? 'Generating...' : 'AI Report'}
                   </button>
-                  <button
-                    onClick={() => window.print()}
+                  <button onClick={() => window.print()}
                     className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold text-sm">
                     ↓ Export PDF
                   </button>
@@ -310,91 +372,53 @@ export default function Dashboard() {
             {/* Sidebar */}
             <div className="col-span-3 space-y-4 no-print">
 
-              {/* Account Selector */}
-              <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">Accounts</h2>
-                <div className="relative mb-3">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                  <input type="text" placeholder="Search accounts..."
-                    value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
-                </div>
-                <div className="flex gap-2 mb-3">
-                  <button onClick={() => setSelectedAccounts(filteredAccounts.map(a => a.id))}
-                    className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
-                    All
-                  </button>
-                  {selectedAccounts.length > 0 && (
-                    <button onClick={() => setSelectedAccounts([])}
-                      className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
-                      Clear ({selectedAccounts.length})
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-1 max-h-64 overflow-y-auto">
-                  {filteredAccounts.map(acc => (
-                    <label key={acc.id}
-                      className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
-                        selectedAccounts.includes(acc.id)
-                          ? 'bg-blue-900 border-blue-500 text-white'
-                          : 'border-slate-600 text-slate-300 hover:bg-slate-700'
-                      }`}>
-                      <input type="checkbox" checked={selectedAccounts.includes(acc.id)}
-                        onChange={() => toggleAccount(acc.id)} className="w-4 h-4 accent-blue-500" />
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{acc.name}</div>
-                        <div className="text-xs text-slate-400">ID: {acc.id}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              {/* Accounts */}
+              <SidebarSection
+                title="Accounts"
+                loading={false}
+                items={filteredAccounts}
+                selectedIds={selectedAccounts}
+                onToggle={toggle(setSelectedAccounts)}
+                onSelectAll={() => setSelectedAccounts(filteredAccounts.map(a => a.id))}
+                onClear={() => setSelectedAccounts([])}
+                searchValue={accountSearch}
+                onSearchChange={setAccountSearch}
+                searchPlaceholder="Search accounts..."
+                emptyMessage="No accounts found"
+              />
 
-              {/* Campaign Selector */}
+              {/* Campaigns */}
               {selectedAccounts.length > 0 && (
-                <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                  <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">
-                    Campaigns {loadingCampaigns && <span className="text-slate-400 font-normal text-xs">(loading...)</span>}
-                  </h2>
-                  <div className="relative mb-3">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <input type="text" placeholder="Search campaigns..."
-                      value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
-                  </div>
-                  <div className="flex gap-2 mb-3">
-                    <button onClick={() => setSelectedCampaigns(filteredCampaigns.map(c => c.id))}
-                      className="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
-                      All
-                    </button>
-                    {selectedCampaigns.length > 0 && (
-                      <button onClick={() => setSelectedCampaigns([])}
-                        className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
-                        Clear ({selectedCampaigns.length})
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {filteredCampaigns.map(c => (
-                      <label key={c.id}
-                        className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
-                          selectedCampaigns.includes(c.id)
-                            ? 'bg-blue-900 border-blue-500 text-white'
-                            : 'border-slate-600 text-slate-300 hover:bg-slate-700'
-                        }`}>
-                        <input type="checkbox" checked={selectedCampaigns.includes(c.id)}
-                          onChange={() => toggleCampaign(c.id)} className="w-4 h-4 accent-blue-500" />
-                        <div className="min-w-0">
-                          <div className="font-medium truncate text-xs">{c.name}</div>
-                          <div className="text-xs text-slate-400">ID: {c.id}</div>
-                        </div>
-                      </label>
-                    ))}
-                    {filteredCampaigns.length === 0 && !loadingCampaigns && (
-                      <p className="text-slate-400 text-xs text-center py-4">No campaigns found</p>
-                    )}
-                  </div>
-                </div>
+                <SidebarSection
+                  title="Campaigns"
+                  loading={loadingCampaigns}
+                  items={filteredCampaigns}
+                  selectedIds={selectedCampaigns}
+                  onToggle={toggle(setSelectedCampaigns)}
+                  onSelectAll={() => setSelectedCampaigns(filteredCampaigns.map(c => c.id))}
+                  onClear={() => setSelectedCampaigns([])}
+                  searchValue={campaignSearch}
+                  onSearchChange={setCampaignSearch}
+                  searchPlaceholder="Search campaigns..."
+                  emptyMessage="No campaigns found"
+                />
+              )}
+
+              {/* Ads */}
+              {selectedCampaigns.length > 0 && (
+                <SidebarSection
+                  title="Ads"
+                  loading={loadingAds}
+                  items={filteredAds}
+                  selectedIds={selectedAds}
+                  onToggle={toggle(setSelectedAds)}
+                  onSelectAll={() => setSelectedAds(filteredAds.map(a => a.id))}
+                  onClear={() => setSelectedAds([])}
+                  searchValue={adSearch}
+                  onSearchChange={setAdSearch}
+                  searchPlaceholder="Search ads..."
+                  emptyMessage="No ads found"
+                />
               )}
             </div>
 
@@ -408,6 +432,23 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
+                  {/* Active filter indicator */}
+                  <div className="flex gap-2 mb-4 flex-wrap no-print">
+                    <span className="px-3 py-1 bg-blue-900 border border-blue-700 rounded-full text-xs text-blue-300 font-medium">
+                      {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''}
+                    </span>
+                    {selectedCampaigns.length > 0 && (
+                      <span className="px-3 py-1 bg-purple-900 border border-purple-700 rounded-full text-xs text-purple-300 font-medium">
+                        {selectedCampaigns.length} Campaign{selectedCampaigns.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {selectedAds.length > 0 && (
+                      <span className="px-3 py-1 bg-emerald-900 border border-emerald-700 rounded-full text-xs text-emerald-300 font-medium">
+                        {selectedAds.length} Ad{selectedAds.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
                   {/* Controls Bar */}
                   <div className="bg-slate-800 rounded-xl p-4 mb-6 border border-slate-700 no-print">
                     <div className="flex flex-wrap items-center gap-4">
@@ -438,9 +479,7 @@ export default function Dashboard() {
                   {/* Print header */}
                   <div className="hidden print:block mb-6">
                     <h2 className="text-xl font-bold text-white">LinkedIn Campaign Report</h2>
-                    <p className="text-slate-400 text-sm">
-                      Period: {currentRange.start} to {currentRange.end} | Compare: {previousRange.start} to {previousRange.end}
-                    </p>
+                    <p className="text-slate-400 text-sm">Period: {currentRange.start} to {currentRange.end} | Compare: {previousRange.start} to {previousRange.end}</p>
                   </div>
 
                   {/* Metrics Grid */}
@@ -625,13 +664,9 @@ function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
       <div className="grid grid-cols-3 gap-6 mb-6">
         <div>
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget</label>
-          <input
-            type="number"
-            placeholder="Enter budget..."
-            value={manualBudget}
-            onChange={e => onBudgetChange(e.target.value)}
-            className="no-print w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500"
-          />
+          <input type="number" placeholder="Enter budget..."
+            value={manualBudget} onChange={e => onBudgetChange(e.target.value)}
+            className="no-print w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500" />
           {manualBudget && (
             <div className="hidden print:block text-2xl font-bold text-white">
               {parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}

@@ -115,47 +115,75 @@ function DateRangePicker({ value, onChange }) {
 }
 
 function SidebarSection({ title, loading, items, selectedIds, onToggle, onSelectAll, onClear, searchValue, onSearchChange, searchPlaceholder, emptyMessage, accentColor = 'blue' }) {
-  const accent = {
-    blue: { selected: 'bg-blue-900 border-blue-500', btn: 'bg-blue-600 hover:bg-blue-700' },
-    purple: { selected: 'bg-purple-900 border-purple-500', btn: 'bg-purple-600 hover:bg-purple-700' },
-    emerald: { selected: 'bg-emerald-900 border-emerald-500', btn: 'bg-emerald-600 hover:bg-emerald-700' },
-    orange: { selected: 'bg-orange-900 border-orange-500', btn: 'bg-orange-600 hover:bg-orange-700' },
-  }[accentColor];
+  const accents = {
+    blue:    { selected: 'bg-blue-900 border-blue-500',    btn: 'bg-blue-600 hover:bg-blue-700',    badge: 'bg-blue-800 text-blue-300' },
+    purple:  { selected: 'bg-purple-900 border-purple-500', btn: 'bg-purple-600 hover:bg-purple-700', badge: 'bg-purple-800 text-purple-300' },
+    emerald: { selected: 'bg-emerald-900 border-emerald-500', btn: 'bg-emerald-600 hover:bg-emerald-700', badge: 'bg-emerald-800 text-emerald-300' },
+    orange:  { selected: 'bg-orange-900 border-orange-500', btn: 'bg-orange-600 hover:bg-orange-700', badge: 'bg-orange-800 text-orange-300' },
+  };
+  const accent = accents[accentColor];
 
   return (
     <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-      <h2 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">
-        {title} {loading && <span className="text-slate-400 font-normal text-xs">(loading...)</span>}
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-bold text-white text-sm uppercase tracking-wide">
+          {title}
+        </h2>
+        <div className="flex items-center gap-2">
+          {loading && <span className="text-slate-400 text-xs">(loading...)</span>}
+          {selectedIds.length > 0 && (
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${accent.badge}`}>
+              {selectedIds.length} selected
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="relative mb-3">
         <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
         <input type="text" placeholder={searchPlaceholder}
           value={searchValue} onChange={e => onSearchChange(e.target.value)}
           className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
       </div>
+
       <div className="flex gap-2 mb-3">
-        <button onClick={onSelectAll} className={`flex-1 px-2 py-1.5 text-white rounded-lg text-xs font-medium ${accent.btn}`}>All</button>
+        <button onClick={onSelectAll}
+          className={`flex-1 px-2 py-1.5 text-white rounded-lg text-xs font-medium ${accent.btn}`}>
+          Select All
+        </button>
         {selectedIds.length > 0 && (
-          <button onClick={onClear} className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
+          <button onClick={onClear}
+            className="flex-1 px-2 py-1.5 bg-slate-600 text-slate-200 rounded-lg text-xs font-medium hover:bg-slate-500">
             Clear ({selectedIds.length})
           </button>
         )}
       </div>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
+
+      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
         {items.map(item => (
-          <label key={item.id} className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border text-sm ${
-            selectedIds.includes(item.id) ? `${accent.selected} text-white` : 'border-slate-600 text-slate-300 hover:bg-slate-700'
-          }`}>
-            <input type="checkbox" checked={selectedIds.includes(item.id)}
-              onChange={() => onToggle(item.id)} className="w-4 h-4 accent-blue-500" />
-            <div className="min-w-0">
-              <div className="font-medium truncate text-xs">{item.name}</div>
-              <div className="text-xs text-slate-400">ID: {item.id}</div>
+          <label key={item.id}
+            className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
+              selectedIds.includes(item.id)
+                ? `${accent.selected} text-white`
+                : 'border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+            }`}>
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(item.id)}
+              onChange={() => onToggle(item.id)}
+              className="w-4 h-4 accent-blue-500 mt-0.5 flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-xs text-white leading-snug truncate">
+                {item.name}
+              </div>
+              <div className="text-xs text-slate-400 font-mono mt-0.5">
+                ID: {item.id}
+              </div>
             </div>
           </label>
         ))}
         {items.length === 0 && !loading && (
-          <p className="text-slate-400 text-xs text-center py-4">{emptyMessage}</p>
+          <p className="text-slate-400 text-xs text-center py-6">{emptyMessage}</p>
         )}
       </div>
     </div>
@@ -168,12 +196,11 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
   function getUrl(id) {
     const base = `https://www.linkedin.com/campaignmanager/accounts/${accountId}`;
     if (type === 'campaign') return `${base}/campaigns/${id}`;
-    if (type === 'ad') return `${base}/campaigns`;
-    return base;
+    return `${base}/campaigns`;
   }
 
   function getName(id) {
-    return nameMap?.[id] || `${type === 'campaign' ? 'Campaign' : 'Ad'} ${id}`;
+    return nameMap?.[String(id)] || `${type === 'campaign' ? 'Campaign' : 'Ad'} ${id}`;
   }
 
   return (
@@ -182,15 +209,16 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
       <div className="space-y-3">
         {items.map((item, i) => (
           <div key={item.id} className="bg-slate-700/50 rounded-lg p-3 border border-slate-600">
-            <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-start justify-between gap-2 mb-1">
               <a href={getUrl(item.id)} target="_blank" rel="noopener noreferrer"
-                className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 truncate">
+                className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 min-w-0">
                 <span className="truncate">{getName(item.id)}</span>
                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
               </a>
-              <span className="text-xs text-slate-400 flex-shrink-0">#{i + 1}</span>
+              <span className="text-xs text-slate-500 flex-shrink-0">#{i + 1}</span>
             </div>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="text-xs text-slate-500 font-mono mb-2">ID: {item.id}</div>
+            <div className="grid grid-cols-4 gap-1 text-center">
               <div>
                 <div className="text-xs text-slate-400">Impr.</div>
                 <div className="text-xs font-bold text-white">{item.impressions.toLocaleString()}</div>
@@ -201,11 +229,15 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
               </div>
               <div>
                 <div className="text-xs text-slate-400">CTR</div>
-                <div className="text-xs font-bold text-emerald-400">{item.ctr || ((item.impressions > 0 ? (item.clicks/item.impressions*100) : 0).toFixed(2))}%</div>
+                <div className="text-xs font-bold text-emerald-400">
+                  {item.ctr || (item.impressions > 0 ? (item.clicks / item.impressions * 100).toFixed(2) : '0.00')}%
+                </div>
               </div>
               <div>
                 <div className="text-xs text-slate-400">Spent</div>
-                <div className="text-xs font-bold text-white">{item.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-xs font-bold text-white">
+                  {item.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </div>
               </div>
             </div>
           </div>
@@ -379,16 +411,14 @@ export default function Dashboard() {
     setGeneratingReport(false);
   }
 
-  // Build name maps for top performers
   const campaignNameMap = Object.fromEntries(campaigns.map(c => [String(c.id), c.name]));
   const adNameMap = Object.fromEntries(ads.map(a => [String(a.id), a.name]));
-
   const primaryAccountId = selectedAccounts[0];
 
-  const filteredAccounts = accounts.filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()));
-  const filteredGroups = campaignGroups.filter(g => !campaignGroupSearch || g.name.toLowerCase().includes(campaignGroupSearch.toLowerCase()));
-  const filteredCampaigns = campaigns.filter(c => !campaignSearch || c.name.toLowerCase().includes(campaignSearch.toLowerCase()));
-  const filteredAds = ads.filter(a => !adSearch || a.name.toLowerCase().includes(adSearch.toLowerCase()));
+  const filteredAccounts = accounts.filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || String(a.id).includes(accountSearch));
+  const filteredGroups = campaignGroups.filter(g => !campaignGroupSearch || g.name.toLowerCase().includes(campaignGroupSearch.toLowerCase()) || String(g.id).includes(campaignGroupSearch));
+  const filteredCampaigns = campaigns.filter(c => !campaignSearch || c.name.toLowerCase().includes(campaignSearch.toLowerCase()) || String(c.id).includes(campaignSearch));
+  const filteredAds = ads.filter(a => !adSearch || a.name.toLowerCase().includes(adSearch.toLowerCase()) || String(a.id).includes(adSearch));
 
   function toggle(setter) {
     return (id) => setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -442,10 +472,13 @@ export default function Dashboard() {
           <div className="grid grid-cols-12 gap-6">
 
             {/* Sidebar */}
-            <div className="col-span-3 space-y-4 no-print">
+            <div className="col-span-3 space-y-3 no-print">
 
-              {/* Step 1: Accounts */}
-              <div className="text-xs text-slate-500 font-bold uppercase tracking-widest px-1">Step 1 — Account</div>
+              {/* Step 1 */}
+              <div className="flex items-center gap-2 px-1">
+                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Account</span>
+              </div>
               <SidebarSection
                 title="Accounts"
                 loading={false}
@@ -456,15 +489,18 @@ export default function Dashboard() {
                 onClear={() => setSelectedAccounts([])}
                 searchValue={accountSearch}
                 onSearchChange={setAccountSearch}
-                searchPlaceholder="Search accounts..."
+                searchPlaceholder="Search by name or ID..."
                 emptyMessage="No accounts found"
                 accentColor="blue"
               />
 
               {selectedAccounts.length > 0 && (
                 <>
-                  {/* Step 2: Campaign Groups */}
-                  <div className="text-xs text-slate-500 font-bold uppercase tracking-widest px-1">Step 2 — Campaign Group</div>
+                  {/* Step 2 */}
+                  <div className="flex items-center gap-2 px-1 pt-2">
+                    <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Campaign Group</span>
+                  </div>
                   <SidebarSection
                     title="Campaign Groups"
                     loading={loadingGroups}
@@ -475,13 +511,16 @@ export default function Dashboard() {
                     onClear={() => setSelectedCampaignGroups([])}
                     searchValue={campaignGroupSearch}
                     onSearchChange={setCampaignGroupSearch}
-                    searchPlaceholder="Search campaign groups..."
+                    searchPlaceholder="Search by name or ID..."
                     emptyMessage="No campaign groups found"
                     accentColor="purple"
                   />
 
-                  {/* Step 3: Campaigns */}
-                  <div className="text-xs text-slate-500 font-bold uppercase tracking-widest px-1">Step 3 — Campaign / Ad Set</div>
+                  {/* Step 3 */}
+                  <div className="flex items-center gap-2 px-1 pt-2">
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Campaign / Ad Set</span>
+                  </div>
                   <SidebarSection
                     title="Campaigns"
                     loading={loadingCampaigns}
@@ -492,17 +531,20 @@ export default function Dashboard() {
                     onClear={() => setSelectedCampaigns([])}
                     searchValue={campaignSearch}
                     onSearchChange={setCampaignSearch}
-                    searchPlaceholder="Search campaigns..."
+                    searchPlaceholder="Search by name or ID..."
                     emptyMessage="No campaigns found"
                     accentColor="emerald"
                   />
                 </>
               )}
 
-              {/* Step 4: Ads */}
+              {/* Step 4 */}
               {selectedCampaigns.length > 0 && (
                 <>
-                  <div className="text-xs text-slate-500 font-bold uppercase tracking-widest px-1">Step 4 — Ads</div>
+                  <div className="flex items-center gap-2 px-1 pt-2">
+                    <span className="w-5 h-5 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Ads</span>
+                  </div>
                   <SidebarSection
                     title="Ads"
                     loading={loadingAds}
@@ -513,7 +555,7 @@ export default function Dashboard() {
                     onClear={() => setSelectedAds([])}
                     searchValue={adSearch}
                     onSearchChange={setAdSearch}
-                    searchPlaceholder="Search ads..."
+                    searchPlaceholder="Search by name or ID..."
                     emptyMessage="No ads found"
                     accentColor="orange"
                   />
@@ -527,7 +569,7 @@ export default function Dashboard() {
                 <div className="bg-slate-800 rounded-xl p-12 text-center border border-slate-700">
                   <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
                   <h2 className="text-2xl font-bold text-white mb-2">Select an Account to Begin</h2>
-                  <p className="text-slate-400">Use the sidebar to filter by account, campaign group, campaign and ad</p>
+                  <p className="text-slate-400">Use the sidebar steps to filter by account, campaign group, campaign and ad</p>
                 </div>
               ) : (
                 <>

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Search, Download, RefreshCw, Calendar, TrendingUp, Eye, MousePointer, DollarSign, Target, Activity, CheckSquare, Square } from 'lucide-react';
+import { Search, Download, RefreshCw, Calendar, TrendingUp, Eye, MousePointer, DollarSign, Target, Activity, CheckSquare, Square, LayoutDashboard, Layers } from 'lucide-react';
+import ObjectiveTabs from './ObjectiveTabs';
 
 const PRESETS = [
   { label: 'This Month', getValue: () => { const n = new Date(); return { start: `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`, end: n.toISOString().split('T')[0] }; }},
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [mainTab, setMainTab] = useState('summary');
 
   const defaultDates = PRESETS[0].getValue();
   const [startDate, setStartDate] = useState(defaultDates.start);
@@ -237,44 +239,75 @@ export default function Dashboard() {
 
           {/* Main Area */}
           <div className="col-span-8">
-            {selectedAccounts.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center">
-                <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Select Accounts to View Reports</h3>
-                <p className="text-gray-600 mb-4">Use the search box and checkboxes on the left to select one or more accounts</p>
-                <div className="inline-block bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-                  <p className="text-sm text-green-700 font-medium">
-                    ✅ {allAccounts.length} accounts ready
-                  </p>
-                </div>
+            {/* Main Tab Bar */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mb-6">
+              <div className="border-b border-gray-200 bg-gray-50 flex">
+                <button
+                  onClick={() => setMainTab('summary')}
+                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-all ${
+                    mainTab === 'summary'
+                      ? 'border-blue-600 text-blue-600 bg-white'
+                      : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Summary
+                </button>
+                <button
+                  onClick={() => setMainTab('performance')}
+                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-all ${
+                    mainTab === 'performance'
+                      ? 'border-blue-600 text-blue-600 bg-white'
+                      : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                  Performance by Objective
+                </button>
               </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''} Selected
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    Report period: {startDate} to {endDate}
-                  </p>
-                </div>
 
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6">Aggregate Performance</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <MetricCard label="Total Impressions" value="Loading..." icon={Eye} />
-                    <MetricCard label="Total Clicks" value="Loading..." icon={MousePointer} />
-                    <MetricCard label="Avg CTR" value="Loading..." icon={TrendingUp} />
-                    <MetricCard label="Total Spend" value="Loading..." icon={DollarSign} />
-                    <MetricCard label="Avg CPC" value="Loading..." icon={DollarSign} />
-                    <MetricCard label="Conversions" value="Loading..." icon={Target} />
-                  </div>
-                  <p className="text-sm text-gray-500 mt-4 text-center">
-                    Campaign data loading will be implemented in next update
-                  </p>
+              {/* Summary Tab */}
+              {mainTab === 'summary' && (
+                <div className="p-6">
+                  {selectedAccounts.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Select Accounts to View Reports</h3>
+                      <p className="text-gray-600 mb-4">Use the search box and checkboxes on the left to select one or more accounts</p>
+                      <div className="inline-block bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                        <p className="text-sm text-green-700 font-medium">✅ {allAccounts.length} accounts ready</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                          {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''} Selected
+                        </h2>
+                        <p className="text-sm text-gray-500">Report period: {startDate} to {endDate}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Aggregate Performance</h3>
+                        <div className="grid grid-cols-3 gap-4">
+                          <MetricCard label="Total Impressions" value="Loading..." icon={Eye} />
+                          <MetricCard label="Total Clicks" value="Loading..." icon={MousePointer} />
+                          <MetricCard label="Avg CTR" value="Loading..." icon={TrendingUp} />
+                          <MetricCard label="Total Spend" value="Loading..." icon={DollarSign} />
+                          <MetricCard label="Avg CPC" value="Loading..." icon={DollarSign} />
+                          <MetricCard label="Conversions" value="Loading..." icon={Target} />
+                        </div>
+                        <p className="text-sm text-gray-500 mt-4 text-center">
+                          Campaign data loading will be implemented in next update
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Performance by Objective Tab */}
+            {mainTab === 'performance' && <ObjectiveTabs />}
           </div>
         </div>
       </div>

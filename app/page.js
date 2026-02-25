@@ -181,6 +181,68 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
     return nameMap?.[String(id)] || `${type === 'campaign' ? 'Campaign' : 'Ad'} ${id}`;
   }
 
+  if (type === 'ad') {
+    return (
+      <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-4">{title}</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-600">
+                <th className="text-left pb-2 px-2 text-slate-400 font-semibold whitespace-nowrap">Creative ID</th>
+                <th className="text-left pb-2 px-2 text-slate-400 font-semibold">Title</th>
+                <th className="text-left pb-2 px-2 text-slate-400 font-semibold">URL</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Impressions</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Clicks</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">CTR</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold whitespace-nowrap">Engagements</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold whitespace-nowrap">Eng. Rate</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold whitespace-nowrap">Other Eng.</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold whitespace-nowrap">Social Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(item => {
+                const name = getName(item.id);
+                const ctr = item.impressions > 0 ? (item.clicks / item.impressions * 100).toFixed(2) : '0.00';
+                const engagements = (item.clicks || 0) + (item.likes || 0) + (item.comments || 0) + (item.shares || 0) + (item.follows || 0);
+                const engRate = item.impressions > 0 ? (engagements / item.impressions * 100).toFixed(2) : '0.00';
+                const otherEng = item.otherEngagements || 0;
+                const socialActions = (item.likes || 0) + (item.comments || 0) + (item.shares || 0) + (item.follows || 0);
+                return (
+                  <tr key={item.id} className="border-b border-slate-700 hover:bg-slate-700/30">
+                    <td className="py-3 px-2 font-mono text-slate-300 whitespace-nowrap">{item.id}</td>
+                    <td className="py-3 px-2 text-slate-200 max-w-xs">
+                      <div className="flex items-start gap-2">
+                        {item.imageUrl && (
+                          <img src={item.imageUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0 border border-slate-600" />
+                        )}
+                        <span className="leading-snug">{name}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      <a href={item.destinationUrl || getUrl(item.id)} target="_blank" rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{item.impressions.toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{item.clicks.toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right text-emerald-400 font-medium">{ctr}%</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{engagements.toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{engRate}%</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{otherEng.toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{socialActions.toLocaleString()}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
       <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-4">{title}</h3>
@@ -197,26 +259,10 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
             </div>
             <div className="text-xs text-slate-500 font-mono mb-2">ID: {item.id}</div>
             <div className="grid grid-cols-4 gap-1 text-center">
-              <div>
-                <div className="text-xs text-slate-400">Impr.</div>
-                <div className="text-xs font-bold text-white">{item.impressions.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-400">Clicks</div>
-                <div className="text-xs font-bold text-white">{item.clicks.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-400">CTR</div>
-                <div className="text-xs font-bold text-emerald-400">
-                  {item.ctr || (item.impressions > 0 ? (item.clicks / item.impressions * 100).toFixed(2) : '0.00')}%
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-400">Spent</div>
-                <div className="text-xs font-bold text-white">
-                  ${item.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                </div>
-              </div>
+              <div><div className="text-xs text-slate-400">Impr.</div><div className="text-xs font-bold text-white">{item.impressions.toLocaleString()}</div></div>
+              <div><div className="text-xs text-slate-400">Clicks</div><div className="text-xs font-bold text-white">{item.clicks.toLocaleString()}</div></div>
+              <div><div className="text-xs text-slate-400">CTR</div><div className="text-xs font-bold text-emerald-400">{item.ctr || (item.impressions > 0 ? (item.clicks / item.impressions * 100).toFixed(2) : '0.00')}%</div></div>
+              <div><div className="text-xs text-slate-400">Spent</div><div className="text-xs font-bold text-white">${item.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div></div>
             </div>
           </div>
         ))}
@@ -832,6 +878,8 @@ export default function Dashboard() {
   const [reportData, setReportData] = useState(null);
   const [exchangeRate, setExchangeRate] = useState(18.5);
   const [manualBudget, setManualBudget] = useState('');
+  const [campaignStart, setCampaignStart] = useState('');
+  const [campaignEnd, setCampaignEnd] = useState('');
 
   const [showReport, setShowReport] = useState(false);
   const [reportResult, setReportResult] = useState(null);
@@ -1145,15 +1193,6 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Compare Period</p>
                         <DateRangePicker value={previousRange} onChange={setPreviousRange} />
                       </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Reference FX Rate (R/$)</p>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-slate-400 text-sm font-bold">R</span>
-                          <input type="number" step="0.01" value={exchangeRate}
-                            onChange={e => setExchangeRate(parseFloat(e.target.value))}
-                            className="w-28 pl-7 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
-                        </div>
-                      </div>
                       <div className="ml-auto">
                         <button onClick={loadAnalytics} disabled={loading}
                           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm">
@@ -1196,12 +1235,18 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-6 mb-6">
                     <TopPerformingBlock title="Top Campaigns" items={reportData.topCampaigns}
                       accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
-                    <TopPerformingBlock title="Top Ads" items={reportData.topAds}
-                      accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
                   </div>
+                  {reportData.topAds && reportData.topAds.length > 0 && (
+                    <div className="mb-6">
+                      <TopPerformingBlock title="Top Performing Ads" items={reportData.topAds}
+                        accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
+                    </div>
+                  )}
 
                   <BudgetPacingCard pacing={reportData.budgetPacing}
-                    manualBudget={manualBudget} onBudgetChange={setManualBudget} />
+                    manualBudget={manualBudget} onBudgetChange={setManualBudget}
+                    campaignStart={campaignStart} campaignEnd={campaignEnd}
+                    onCampaignStartChange={setCampaignStart} onCampaignEndChange={setCampaignEnd} />
 
                   <FXCalculatorBlock reportData={reportData} currentRange={currentRange} />
                 </>
@@ -1250,66 +1295,90 @@ function MetricCard({ label, current, previous, format, icon: Icon, prefix = '' 
   );
 }
 
-function BudgetPacingCard({ pacing, manualBudget, onBudgetChange }) {
+function BudgetPacingCard({ pacing, manualBudget, onBudgetChange, campaignStart, campaignEnd, onCampaignStartChange, onCampaignEndChange }) {
   if (!pacing) return null;
   const budget = parseFloat(manualBudget) || 0;
-  const pacingPercent = budget > 0 ? Math.min((pacing.spent / budget * 100), 100).toFixed(1) : 0;
-  const now = new Date();
-  const todayDate = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const dayProgress = ((todayDate / daysInMonth) * 100).toFixed(1);
+  const pacingPercent = budget > 0 ? Math.min((pacing.spent / budget * 100), 100).toFixed(2) : null;
+
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0].replace(/-/g, '/');
+
+  let daysElapsed = null, daysTotal = null;
+  if (campaignStart && campaignEnd) {
+    const start = new Date(campaignStart);
+    const end = new Date(campaignEnd);
+    daysTotal = Math.ceil((end - start) / 86400000) + 1;
+    daysElapsed = Math.min(Math.ceil((today - start) / 86400000), daysTotal);
+  }
 
   return (
     <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
       <h3 className="text-lg font-bold text-white mb-6">Budgeting and Pacing</h3>
-      <div className="grid grid-cols-3 gap-6 mb-6">
-        <div>
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Budget (USD)</label>
-          <div className="relative">
-            <span className="absolute left-3 top-2.5 text-slate-400 text-sm font-bold">$</span>
-            <input type="number" placeholder="Enter budget..." value={manualBudget}
-              onChange={e => onBudgetChange(e.target.value)}
-              className="no-print w-full pl-7 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-blue-500" />
-          </div>
-          {manualBudget && (
-            <div className="hidden print:block text-2xl font-bold text-white">
-              ${parseFloat(manualBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+      <div className="grid grid-cols-2 gap-6">
+
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Budget</p>
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-xs text-slate-400 mb-1">Current Spent</p>
+              <p className="text-2xl font-bold text-slate-900">
+                R {pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              </p>
             </div>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Spent (USD)</label>
-          <div className="text-2xl font-bold text-white">
-            ${pacing.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Pacing</p>
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-xs text-slate-400 mb-1">Date Pacing</p>
+              <p className={`text-2xl font-bold ${pacingPercent ? (parseFloat(pacingPercent) > 90 ? 'text-red-500' : parseFloat(pacingPercent) > 70 ? 'text-yellow-500' : 'text-slate-900') : 'text-slate-900'}`}>
+                {pacingPercent ? `${pacingPercent}%` : '-'}
+              </p>
+              <div className="no-print mt-3 space-y-1">
+                <p className="text-xs text-slate-400">Manual Budget (R)</p>
+                <input type="number" placeholder="Enter total budget..." value={manualBudget}
+                  onChange={e => onBudgetChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-800 text-sm focus:outline-none focus:border-blue-500" />
+              </div>
+            </div>
           </div>
         </div>
-        <div>
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Pacing</label>
-          <div className={`text-2xl font-bold ${parseFloat(pacingPercent) > 90 ? 'text-red-400' : parseFloat(pacingPercent) > 70 ? 'text-yellow-400' : 'text-emerald-400'}`}>
-            {budget > 0 ? `${pacingPercent}%` : '-'}
+
+        <div className="bg-white rounded-xl p-5">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Campaign Duration</p>
+          <div className="border-t border-slate-100 pt-3 space-y-4">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Duration</p>
+              <p className="text-sm font-bold text-slate-900">
+                {campaignStart && campaignEnd
+                  ? `${campaignStart.replace(/-/g, '/')} - ${campaignEnd.replace(/-/g, '/')}`
+                  : <span className="text-sm text-slate-400 font-normal">Set dates below</span>}
+              </p>
+            </div>
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-xs text-slate-400 mb-1">Current Date</p>
+              <p className="text-sm font-bold text-slate-900">{todayStr}</p>
+            </div>
+            {daysTotal !== null && (
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-xs text-slate-400 mb-1">Progress</p>
+                <p className="text-sm font-bold text-slate-900">{daysElapsed}/{daysTotal} days</p>
+              </div>
+            )}
+            <div className="no-print border-t border-slate-100 pt-3 space-y-2">
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Campaign Start Date</p>
+                <input type="date" value={campaignStart || ''} onChange={e => onCampaignStartChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-800 text-sm focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Campaign End Date</p>
+                <input type="date" value={campaignEnd || ''} onChange={e => onCampaignEndChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-800 text-sm focus:outline-none focus:border-blue-500" />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      {budget > 0 && (
-        <div className="mb-4">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="font-medium text-slate-300">Budget Progress</span>
-            <span className="text-slate-400">{pacingPercent}%</span>
-          </div>
-          <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-            <div className={`h-full transition-all rounded-full ${parseFloat(pacingPercent) > 90 ? 'bg-red-500' : parseFloat(pacingPercent) > 70 ? 'bg-yellow-500' : 'bg-blue-500'}`}
-              style={{ width: `${pacingPercent}%` }} />
-          </div>
-        </div>
-      )}
-      <div>
-        <div className="flex justify-between text-sm mb-2">
-          <span className="font-medium text-slate-300">Time Progress</span>
-          <span className="text-slate-400">{todayDate}/{daysInMonth} days ({dayProgress}%)</span>
-        </div>
-        <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-          <div className="h-full bg-slate-500 transition-all rounded-full" style={{ width: `${dayProgress}%` }} />
-        </div>
+
       </div>
     </div>
   );

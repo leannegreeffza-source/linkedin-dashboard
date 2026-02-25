@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import {
   TrendingUp, MousePointer, DollarSign, Target, Eye,
-  Video, Users, ChevronDown, ChevronUp, Calendar, Building2
+  Video, Users, ChevronDown, ChevronUp, Calendar, Building2,
+  ExternalLink, Award, Play, Clock, BarChart2, Layers
 } from 'lucide-react';
 
 // ─── BENCHMARKS ──────────────────────────────────────────────
@@ -18,12 +19,12 @@ const BENCHMARKS = {
 
 // ─── HARDCODED REPORT DATA ────────────────────────────────────
 const ENGAGEMENT_WEEKLY = [
-  { week: 'Week 1', dates: 'Dec 01–07', ctr: 7.038, cpc: 0.82, engRate: 7.078, webClicks: 20, webCtr: 0.791, impressions: 2529, clicks: 178, spend: 146.66, days: 7 },
-  { week: 'Week 2', dates: 'Dec 08–14', ctr: 7.245, cpc: 0.58, engRate: 7.473, webClicks: 35, webCtr: 0.998, impressions: 3506, clicks: 254, spend: 146.79, days: 7 },
-  { week: 'Week 3', dates: 'Dec 15–21', ctr: 7.765, cpc: 0.83, engRate: 7.765, webClicks: 26, webCtr: 1.030, impressions: 2524, clicks: 196, spend: 163.52, days: 7 },
-  { week: 'Week 4', dates: 'Dec 22–28', ctr: 8.643, cpc: 0.85, engRate: 8.748, webClicks: 20, webCtr: 1.048, impressions: 1909, clicks: 165, spend: 140.97, days: 7 },
-  { week: 'Week 5', dates: 'Dec 29–Jan 04', ctr: 7.938, cpc: 0.90, engRate: 7.938, webClicks: 20, webCtr: 1.142, impressions: 1751, clicks: 139, spend: 124.97, days: 6 },
-  { week: 'Week 6', dates: 'Jan 05', ctr: 11.386, cpc: 0.81, engRate: 11.881, webClicks: 5, webCtr: 2.475, impressions: 202, clicks: 23, spend: 18.55, days: 1 },
+  { week: 'Week 1', dates: 'Dec 01–07',    ctr: 7.038,  cpc: 0.82, engRate: 7.078,  webClicks: 20, webCtr: 0.791, impressions: 2529, clicks: 178, spend: 146.66, days: 7 },
+  { week: 'Week 2', dates: 'Dec 08–14',    ctr: 7.245,  cpc: 0.58, engRate: 7.473,  webClicks: 35, webCtr: 0.998, impressions: 3506, clicks: 254, spend: 146.79, days: 7 },
+  { week: 'Week 3', dates: 'Dec 15–21',    ctr: 7.765,  cpc: 0.83, engRate: 7.765,  webClicks: 26, webCtr: 1.030, impressions: 2524, clicks: 196, spend: 163.52, days: 7 },
+  { week: 'Week 4', dates: 'Dec 22–28',    ctr: 8.643,  cpc: 0.85, engRate: 8.748,  webClicks: 20, webCtr: 1.048, impressions: 1909, clicks: 165, spend: 140.97, days: 7 },
+  { week: 'Week 5', dates: 'Dec 29–Jan 04',ctr: 7.938,  cpc: 0.90, engRate: 7.938,  webClicks: 20, webCtr: 1.142, impressions: 1751, clicks: 139, spend: 124.97, days: 6 },
+  { week: 'Week 6', dates: 'Jan 05',       ctr: 11.386, cpc: 0.81, engRate: 11.881, webClicks: 5,  webCtr: 2.475, impressions: 202,  clicks: 23,  spend: 18.55,  days: 1 },
 ];
 
 const ENGAGEMENT_DAILY = [
@@ -86,13 +87,13 @@ const LEADS_WEEKLY = [
 
 const LEADS_DAILY = [
   { week: 'Week 1 (Dec 04–10)', rows: [
-    { date: 'Thu Dec 04', leads: 0, cpl: '€0.00', spend: '€14.20' },
-    { date: 'Fri Dec 05', leads: 0, cpl: '€0.00', spend: '€17.40' },
+    { date: 'Thu Dec 04', leads: 0, cpl: '€0.00',  spend: '€14.20' },
+    { date: 'Fri Dec 05', leads: 0, cpl: '€0.00',  spend: '€17.40' },
     { date: 'Sat Dec 06', leads: 1, cpl: '€12.60', spend: '€12.60' },
-    { date: 'Sun Dec 07', leads: 0, cpl: '€0.00', spend: '€12.80' },
+    { date: 'Sun Dec 07', leads: 0, cpl: '€0.00',  spend: '€12.80' },
     { date: 'Mon Dec 08', leads: 1, cpl: '€19.94', spend: '€19.94' },
-    { date: 'Tue Dec 09', leads: 0, cpl: '€0.00', spend: '€20.35' },
-    { date: 'Wed Dec 10', leads: 0, cpl: '€0.00', spend: '€21.14' },
+    { date: 'Tue Dec 09', leads: 0, cpl: '€0.00',  spend: '€20.35' },
+    { date: 'Wed Dec 10', leads: 0, cpl: '€0.00',  spend: '€21.14' },
   ]},
   { week: 'Week 2 (Dec 11–17)', rows: [
     { date: 'Thu Dec 11', leads: 0, cpl: '€0.00', spend: '€25.27' },
@@ -132,12 +133,12 @@ const LEADS_DAILY = [
 ];
 
 const VIDEO_WEEKLY = [
-  { week: 'Week 1', dates: 'Dec 01–07',   views: 2227, viewRate: 33.12, cpv: 0.091, plays: 6725,  spend: 203.12, days: 7 },
-  { week: 'Week 2', dates: 'Dec 08–14',   views: 2325, viewRate: 31.67, cpv: 0.080, plays: 7342,  spend: 187.01, days: 7 },
-  { week: 'Week 3', dates: 'Dec 15–21',   views: 2899, viewRate: 33.98, cpv: 0.097, plays: 8532,  spend: 279.83, days: 7 },
-  { week: 'Week 4', dates: 'Dec 22–28',   views: 2152, viewRate: 34.47, cpv: 0.136, plays: 6243,  spend: 293.46, days: 7 },
-  { week: 'Week 5', dates: 'Dec 29–Jan 04', views: 2400, viewRate: 38.07, cpv: 0.134, plays: 6304, spend: 321.75, days: 7 },
-  { week: 'Week 6', dates: 'Jan 05–06',   views: 640,  viewRate: 39.53, cpv: 0.118, plays: 1619,  spend: 75.53,  days: 2 },
+  { week: 'Week 1', dates: 'Dec 01–07',    views: 2227, viewRate: 33.12, cpv: 0.091, plays: 6725,  spend: 203.12, days: 7 },
+  { week: 'Week 2', dates: 'Dec 08–14',    views: 2325, viewRate: 31.67, cpv: 0.080, plays: 7342,  spend: 187.01, days: 7 },
+  { week: 'Week 3', dates: 'Dec 15–21',    views: 2899, viewRate: 33.98, cpv: 0.097, plays: 8532,  spend: 279.83, days: 7 },
+  { week: 'Week 4', dates: 'Dec 22–28',    views: 2152, viewRate: 34.47, cpv: 0.136, plays: 6243,  spend: 293.46, days: 7 },
+  { week: 'Week 5', dates: 'Dec 29–Jan 04',views: 2400, viewRate: 38.07, cpv: 0.134, plays: 6304,  spend: 321.75, days: 7 },
+  { week: 'Week 6', dates: 'Jan 05–06',    views: 640,  viewRate: 39.53, cpv: 0.118, plays: 1619,  spend: 75.53,  days: 2 },
 ];
 
 const VIDEO_DAILY = [
@@ -193,12 +194,12 @@ const VIDEO_DAILY = [
 ];
 
 const WEBSITE_WEEKLY = [
-  { week: 'Week 1', dates: 'Dec 01–07',   ctr: 4.838, cpc: 1.64, impressions: 7981,  clicks: 139, spend: 221.69, days: 7 },
-  { week: 'Week 2', dates: 'Dec 08–14',   ctr: 1.224, cpc: 1.45, impressions: 11307, clicks: 121, spend: 185.37, days: 7 },
-  { week: 'Week 3', dates: 'Dec 15–21',   ctr: 0.836, cpc: 1.53, impressions: 21045, clicks: 172, spend: 260.60, days: 7 },
-  { week: 'Week 4', dates: 'Dec 22–28',   ctr: 1.249, cpc: 1.88, impressions: 11366, clicks: 141, spend: 266.56, days: 7 },
-  { week: 'Week 5', dates: 'Dec 29–Jan 04', ctr: 1.375, cpc: 2.02, impressions: 11140, clicks: 145, spend: 293.60, days: 7 },
-  { week: 'Week 6', dates: 'Jan 05–06',   ctr: 0.941, cpc: 1.91, impressions: 4687,  clicks: 44,  spend: 84.12,  days: 2 },
+  { week: 'Week 1', dates: 'Dec 01–07',    ctr: 4.838, cpc: 1.64, impressions: 7981,  clicks: 139, spend: 221.69, days: 7 },
+  { week: 'Week 2', dates: 'Dec 08–14',    ctr: 1.224, cpc: 1.45, impressions: 11307, clicks: 121, spend: 185.37, days: 7 },
+  { week: 'Week 3', dates: 'Dec 15–21',    ctr: 0.836, cpc: 1.53, impressions: 21045, clicks: 172, spend: 260.60, days: 7 },
+  { week: 'Week 4', dates: 'Dec 22–28',    ctr: 1.249, cpc: 1.88, impressions: 11366, clicks: 141, spend: 266.56, days: 7 },
+  { week: 'Week 5', dates: 'Dec 29–Jan 04',ctr: 1.375, cpc: 2.02, impressions: 11140, clicks: 145, spend: 293.60, days: 7 },
+  { week: 'Week 6', dates: 'Jan 05–06',    ctr: 0.941, cpc: 1.91, impressions: 4687,  clicks: 44,  spend: 84.12,  days: 2 },
 ];
 
 const WEBSITE_DAILY = [
@@ -252,6 +253,83 @@ const WEBSITE_DAILY = [
     { date: 'Tue Jan 06', ctr: '0.866%', cpc: '€1.91', impressions: 2424, clicks: 21, spend: '€40.14' },
   ]},
 ];
+
+// ─── TOP CAMPAIGNS DATA PER OBJECTIVE ────────────────────────
+const TOP_CAMPAIGNS = {
+  engagement: [
+    {
+      rank: 1,
+      name: 'ww-abm-tla-embskills',
+      id: '392510836',
+      impressions: 37989,
+      clicks: 2842,
+      ctr: '7.48%',
+      spend: '$1,412.07',
+      linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/392510836/campaigns',
+      ads: [
+        { name: 'Ben v Cornell – Boosted Post v1', id: 'AD-001', linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/392510836/campaigns/ads' },
+      ],
+    },
+    {
+      rank: 2,
+      name: 'ww-abm-tla-embskills_2',
+      id: '483364513',
+      impressions: 3188,
+      clicks: 282,
+      ctr: '8.85%',
+      spend: '$355.48',
+      linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/483364513/campaigns',
+      ads: [
+        { name: 'Ben v Cornell – Boosted Post v2', id: 'AD-002', linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/483364513/campaigns/ads' },
+      ],
+    },
+  ],
+  leads: [
+    {
+      rank: 1,
+      name: 'cTrader – AWARE Brokers – Message',
+      id: 'C03510',
+      impressions: 0,
+      clicks: 0,
+      ctr: '—',
+      spend: '€636.56',
+      linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/C03510/campaigns',
+      ads: [
+        { name: 'cTrader Lead Form Ad v1', id: 'AD-003', linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/C03510/campaigns/ads' },
+      ],
+    },
+  ],
+  video: [
+    {
+      rank: 1,
+      name: 'Cold Unaware – Video Views – Brokers',
+      id: 'C03482-V',
+      impressions: 36765,
+      clicks: 0,
+      ctr: '—',
+      spend: '€1,360.70',
+      linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/C03482/campaigns',
+      ads: [
+        { name: 'Pain Points Video – ICP 1.1', id: 'AD-004', linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/C03482/campaigns/ads' },
+      ],
+    },
+  ],
+  website: [
+    {
+      rank: 1,
+      name: 'Pain Points – Single Image – Brokers',
+      id: 'C03482',
+      impressions: 67526,
+      clicks: 762,
+      ctr: '1.74%',
+      spend: '€1,311.94',
+      linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/C03482/campaigns',
+      ads: [
+        { name: 'Pain Points – Single Image Ad v1', id: 'AD-005', linkedinUrl: 'https://www.linkedin.com/campaignmanager/accounts/C03482/campaigns/ads' },
+      ],
+    },
+  ],
+};
 
 // ─── SHARED COMPONENTS ───────────────────────────────────────
 
@@ -396,6 +474,110 @@ function DailyAccordion({ weeks, columns, getRow }) {
   );
 }
 
+// ─── TOP CAMPAIGNS SECTION ────────────────────────────────────
+function TopCampaignsSection({ objective }) {
+  const campaigns = TOP_CAMPAIGNS[objective] || [];
+  const [expandedAds, setExpandedAds] = useState({});
+  const toggleAds = (id) => setExpandedAds(prev => ({ ...prev, [id]: !prev[id] }));
+
+  if (!campaigns.length) return null;
+
+  return (
+    <div className="mb-8">
+      <SectionTitle>
+        <Award className="w-4 h-4 text-yellow-500" /> Top Performing Campaigns
+      </SectionTitle>
+      <div className="space-y-3">
+        {campaigns.map((c) => (
+          <div key={c.id} className="border border-gray-200 rounded-xl overflow-hidden">
+            {/* Campaign row */}
+            <div className="bg-gray-50 px-4 py-3 flex flex-wrap items-center gap-4">
+              {/* Rank badge */}
+              <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+                ${c.rank === 1 ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-300 text-gray-700'}`}>
+                #{c.rank}
+              </span>
+
+              {/* Name + ID */}
+              <div className="flex-1 min-w-0">
+                <a
+                  href={c.linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 truncate"
+                >
+                  {c.name}
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </a>
+                <p className="text-xs text-gray-400">ID: {c.id}</p>
+              </div>
+
+              {/* Stats */}
+              <div className="flex flex-wrap gap-5 text-sm">
+                {c.impressions > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Impr.</p>
+                    <p className="font-semibold text-gray-800">{c.impressions.toLocaleString()}</p>
+                  </div>
+                )}
+                {c.clicks > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Clicks</p>
+                    <p className="font-semibold text-gray-800">{c.clicks.toLocaleString()}</p>
+                  </div>
+                )}
+                {c.ctr !== '—' && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">CTR</p>
+                    <p className="font-semibold text-green-600">{c.ctr}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Spent</p>
+                  <p className="font-semibold text-gray-800">{c.spend}</p>
+                </div>
+              </div>
+
+              {/* Toggle ads */}
+              <button
+                onClick={() => toggleAds(c.id)}
+                className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 ml-auto flex-shrink-0"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Ads ({c.ads.length})
+                {expandedAds[c.id] ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+
+            {/* Ads sub-section */}
+            {expandedAds[c.id] && (
+              <div className="border-t border-gray-200 bg-white">
+                {c.ads.map((ad) => (
+                  <div key={ad.id} className="flex items-center gap-3 px-6 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <a
+                        href={ad.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                      >
+                        {ad.name}
+                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                      </a>
+                      <p className="text-xs text-gray-400">ID: {ad.id}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── CONTEXT BAR ─────────────────────────────────────────────
 function ContextBar({ selectedAccounts, allAccounts, startDate, endDate, activePreset }) {
   if (!selectedAccounts || selectedAccounts.length === 0) return null;
@@ -425,6 +607,11 @@ function ContextBar({ selectedAccounts, allAccounts, startDate, endDate, activeP
 // ─── OBJECTIVE TAB PANELS ─────────────────────────────────────
 
 function EngagementTab() {
+  // Derived: landing page clicks = webClicks total, landing page CTR = (webClicks / impressions) * 100
+  const totalImpressions = ENGAGEMENT_WEEKLY.reduce((s, w) => s + w.impressions, 0);
+  const totalWebClicks   = ENGAGEMENT_WEEKLY.reduce((s, w) => s + w.webClicks, 0);
+  const lpCtr            = totalImpressions > 0 ? ((totalWebClicks / totalImpressions) * 100).toFixed(3) : '0.000';
+
   return (
     <div>
       <CampaignBanner
@@ -434,32 +621,48 @@ function EngagementTab() {
         period="Dec 01 2025 – Jan 05 2026"
         color="indigo"
       />
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <KpiCard label="Total Spend"      value="$741.46"  sub="6 weeks"             icon={DollarSign} />
-        <KpiCard label="Avg CTR"          value="7.69%"    sub="955 total clicks"     icon={TrendingUp}  benchmark={7.69}  benchmarkValue={BENCHMARKS.ctr} />
-        <KpiCard label="Avg CPC"          value="$0.78"    sub="Across 6 weeks"       icon={DollarSign} />
-        <KpiCard label="Engagement Rate"  value="7.79%"    sub="967 engagements"      icon={Users}       benchmark={7.79}  benchmarkValue={BENCHMARKS.engagementRate} />
-        <KpiCard label="Web Visit Clicks" value="126"      sub="Total clicks"         icon={MousePointer} />
-        <KpiCard label="Web CTR"          value="1.01%"    sub="Avg across weeks"     icon={Target}      benchmark={1.01}  benchmarkValue={BENCHMARKS.websiteCtr} />
+
+      {/* Campaign Performance KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+        <KpiCard label="Total Spend"        value="$741.46"   sub="6 weeks"                                                   icon={DollarSign} />
+        <KpiCard label="Avg CTR"            value="7.69%"     sub="955 total clicks"         benchmark={7.69}  benchmarkValue={BENCHMARKS.ctr}            icon={TrendingUp} />
+        <KpiCard label="Avg CPC"            value="$0.78"     sub="Across 6 weeks"                                            icon={DollarSign} />
+        <KpiCard label="Engagement Rate"    value="7.79%"     sub="967 engagements"          benchmark={7.79}  benchmarkValue={BENCHMARKS.engagementRate} icon={Users} />
+        <KpiCard label="Web Visit Clicks"   value="126"       sub="Total landing page clicks"                                 icon={MousePointer} />
+        <KpiCard label="Web CTR"            value="1.01%"     sub="Avg across weeks"         benchmark={1.01}  benchmarkValue={BENCHMARKS.websiteCtr}     icon={Target} />
+        {/* NEW: Landing Page Clicks & CTR */}
+        <KpiCard label="Landing Page Clicks" value={totalWebClicks.toLocaleString()} sub="Total LP clicks"                   icon={MousePointer} />
+        <KpiCard label="Landing Page CTR"    value={`${lpCtr}%`} sub="(LP Clicks / Impressions) × 100" benchmark={parseFloat(lpCtr)} benchmarkValue={BENCHMARKS.websiteCtr} icon={TrendingUp} />
+        {/* NEW: Reach & Average Frequency */}
+        <KpiCard label="Reach"              value="—"         sub="Not available in source"                                  icon={Eye} />
+        <KpiCard label="Avg Frequency"      value="—"         sub="Not available in source"                                  icon={BarChart2} />
       </div>
+
+      <TopCampaignsSection objective="engagement" />
 
       <SectionTitle><TrendingUp className="w-4 h-4 text-blue-500" /> Week-by-Week Summary</SectionTitle>
       <WeeklyTable
-        columns={['Week', 'CTR', 'CPC', 'Eng Rate', 'Web Clicks', 'Web CTR', 'Impressions', 'Clicks', 'Spend', 'Status']}
-        rows={ENGAGEMENT_WEEKLY.map(w => [
-          <span key={w.week}><span className="font-semibold text-gray-900">{w.week}</span><br /><span className="text-xs text-gray-400">{w.dates}</span></span>,
-          `${w.ctr.toFixed(3)}%`, `$${w.cpc.toFixed(2)}`, `${w.engRate.toFixed(3)}%`,
-          w.webClicks, `${w.webCtr.toFixed(3)}%`, w.impressions.toLocaleString(),
-          w.clicks, `$${w.spend.toFixed(2)}`,
-          <StatusBadge key="status" ok={true} />
-        ])}
+        columns={['Week', 'CTR', 'CPC', 'Eng Rate', 'Web Clicks', 'Web CTR', 'LP CTR', 'Impressions', 'Clicks', 'Spend', 'Status']}
+        rows={ENGAGEMENT_WEEKLY.map(w => {
+          const wLpCtr = w.impressions > 0 ? ((w.webClicks / w.impressions) * 100).toFixed(3) : '0.000';
+          return [
+            <span key={w.week}><span className="font-semibold text-gray-900">{w.week}</span><br /><span className="text-xs text-gray-400">{w.dates}</span></span>,
+            `${w.ctr.toFixed(3)}%`, `$${w.cpc.toFixed(2)}`, `${w.engRate.toFixed(3)}%`,
+            w.webClicks, `${w.webCtr.toFixed(3)}%`, `${wLpCtr}%`,
+            w.impressions.toLocaleString(), w.clicks, `$${w.spend.toFixed(2)}`,
+            <StatusBadge key="status" ok={true} />,
+          ];
+        })}
       />
 
       <SectionTitle><Eye className="w-4 h-4 text-blue-500" /> Daily Breakdown</SectionTitle>
       <DailyAccordion
         weeks={ENGAGEMENT_DAILY}
-        columns={['Date', 'CTR', 'CPC', 'Eng Rate', 'Web Clicks', 'Web CTR', 'Impressions', 'Clicks', 'Spend']}
-        getRow={r => [r.date, r.ctr, r.cpc, r.engRate, r.webClicks, r.webCtr, r.impressions.toLocaleString(), r.clicks, r.spend]}
+        columns={['Date', 'CTR', 'CPC', 'Eng Rate', 'Web Clicks', 'Web CTR', 'LP CTR', 'Impressions', 'Clicks', 'Spend']}
+        getRow={r => {
+          const lp = r.impressions > 0 ? ((r.webClicks / r.impressions) * 100).toFixed(3) + '%' : '0.000%';
+          return [r.date, r.ctr, r.cpc, r.engRate, r.webClicks, r.webCtr, lp, r.impressions.toLocaleString(), r.clicks, r.spend];
+        }}
       />
     </div>
   );
@@ -475,25 +678,32 @@ function LeadsTab() {
         period="Dec 04 2025 – Jan 06 2026"
         color="blue"
       />
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <KpiCard label="Total Spend"     value="€636.56"  sub="5 weeks"              icon={DollarSign} />
-        <KpiCard label="Total Leads"     value="7"        sub="Across 5 weeks"        icon={Target} />
-        <KpiCard label="Avg CPL"         value="€90.94"   sub="Cost per lead"         icon={DollarSign} />
-        <KpiCard label="Best CPL"        value="€49.80"   sub="Week 4 · 2 leads"      icon={TrendingUp} />
-        <KpiCard label="Form Opens"      value="—"        sub="Not in source data"    icon={MousePointer} />
-        <KpiCard label="Completion Rate" value="—"        sub={`Benchmark: ${BENCHMARKS.leadFormCompletionRate}%`} icon={Target} />
+
+      {/* Campaign Performance KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+        <KpiCard label="Total Spend"          value="€636.56"  sub="5 weeks"                                                                 icon={DollarSign} />
+        <KpiCard label="Total Leads"          value="7"        sub="Across 5 weeks"                                                          icon={Target} />
+        <KpiCard label="Avg CPL"              value="€90.94"   sub="Cost per lead"                                                           icon={DollarSign} />
+        <KpiCard label="Best CPL"             value="€49.80"   sub="Week 4 · 2 leads"                                                        icon={TrendingUp} />
+        {/* NEW: Lead Form Opens & Completion Rate */}
+        <KpiCard label="Lead Form Opens"      value="—"        sub="Not in source data"                                                      icon={MousePointer} />
+        <KpiCard label="Form Completion Rate" value="—"        sub={`Benchmark: ${BENCHMARKS.leadFormCompletionRate}%`}                      icon={Target} />
       </div>
+
+      <TopCampaignsSection objective="leads" />
 
       <SectionTitle><TrendingUp className="w-4 h-4 text-blue-500" /> Week-by-Week Summary</SectionTitle>
       <WeeklyTable
-        columns={['Week', 'Leads', 'CPL', 'Total Spend', 'Days Active', 'Status']}
+        columns={['Week', 'Leads', 'CPL', 'Form Opens', 'Completion Rate', 'Total Spend', 'Days Active', 'Status']}
         rows={LEADS_WEEKLY.map(w => [
           <span key={w.week}><span className="font-semibold text-gray-900">{w.week}</span><br /><span className="text-xs text-gray-400">{w.dates}</span></span>,
           w.leads,
           w.cpl > 0 ? `€${w.cpl.toFixed(2)}` : '€0.00',
+          '—',
+          '—',
           `€${w.spend.toFixed(2)}`,
           w.days,
-          <StatusBadge key="status" ok={w.leads > 0} />
+          <StatusBadge key="status" ok={w.leads > 0} />,
         ])}
       />
 
@@ -508,6 +718,11 @@ function LeadsTab() {
 }
 
 function VideoTab() {
+  const totalViews = VIDEO_WEEKLY.reduce((s, w) => s + w.views, 0);
+  const totalPlays = VIDEO_WEEKLY.reduce((s, w) => s + w.plays, 0);
+  const avgViewRate = (VIDEO_WEEKLY.reduce((s, w) => s + w.viewRate, 0) / VIDEO_WEEKLY.length).toFixed(2);
+  const avgCpv = (VIDEO_WEEKLY.reduce((s, w) => s + w.cpv, 0) / VIDEO_WEEKLY.length).toFixed(3);
+
   return (
     <div>
       <CampaignBanner
@@ -517,14 +732,23 @@ function VideoTab() {
         period="Dec 01 2025 – Jan 06 2026"
         color="violet"
       />
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <KpiCard label="Total Spend"      value="€1,360.70" sub="6 weeks"                                         icon={DollarSign} />
-        <KpiCard label="View Rate"        value="34.39%"    sub="Avg across weeks"                                icon={Video}      benchmark={34.39} benchmarkValue={BENCHMARKS.videoViewThroughRate} />
-        <KpiCard label="Avg CPV"          value="€0.108"    sub="Cost per view"                                   icon={DollarSign} />
-        <KpiCard label="Total Views"      value="12,643"    sub="36,765 total plays"                              icon={Eye} />
-        <KpiCard label="50% View Rate"    value="—"         sub="Not in source data"                              icon={TrendingUp} />
-        <KpiCard label="Completion Rate"  value="34.39%"    sub={`Benchmark: ${BENCHMARKS.videoCompletionRate}%`} icon={Target}     benchmark={34.39} benchmarkValue={BENCHMARKS.videoCompletionRate} />
+
+      {/* Campaign Performance KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+        <KpiCard label="Total Spend"        value="€1,360.70"                  sub="6 weeks"                                                          icon={DollarSign} />
+        {/* NEW: Views */}
+        <KpiCard label="Total Views"        value={totalViews.toLocaleString()} sub={`${totalPlays.toLocaleString()} total plays`}                    icon={Eye} />
+        {/* NEW: View Rate */}
+        <KpiCard label="View Rate"          value={`${avgViewRate}%`}           sub="Avg across weeks"    benchmark={parseFloat(avgViewRate)} benchmarkValue={BENCHMARKS.videoViewThroughRate} icon={Video} />
+        {/* NEW: CPV */}
+        <KpiCard label="Avg CPV"            value={`€${avgCpv}`}               sub="Cost per view"                                                    icon={DollarSign} />
+        {/* NEW: Avg Video Watch Time */}
+        <KpiCard label="Avg Watch Time"     value="—"                          sub="Not in source data"                                               icon={Clock} />
+        <KpiCard label="50% View Rate"      value="—"                          sub="Not in source data"                                               icon={Play} />
+        <KpiCard label="Completion Rate"    value="34.39%"                     sub={`Benchmark: ${BENCHMARKS.videoCompletionRate}%`} benchmark={34.39} benchmarkValue={BENCHMARKS.videoCompletionRate} icon={Target} />
       </div>
+
+      <TopCampaignsSection objective="video" />
 
       <SectionTitle><TrendingUp className="w-4 h-4 text-blue-500" /> Week-by-Week Summary</SectionTitle>
       <WeeklyTable
@@ -537,7 +761,7 @@ function VideoTab() {
           w.plays.toLocaleString(),
           `€${w.spend.toFixed(2)}`,
           w.days,
-          <StatusBadge key="status" ok={true} />
+          <StatusBadge key="status" ok={true} />,
         ])}
       />
 
@@ -552,6 +776,12 @@ function VideoTab() {
 }
 
 function WebsiteTab() {
+  const totalImpressions = WEBSITE_WEEKLY.reduce((s, w) => s + w.impressions, 0);
+  const totalClicks      = WEBSITE_WEEKLY.reduce((s, w) => s + w.clicks, 0);
+  // Audience penetration = unique members reached / total audience size.
+  // Placeholder as source data doesn't include audience size directly.
+  const audiencePenetration = '—';
+
   return (
     <div>
       <CampaignBanner
@@ -561,14 +791,20 @@ function WebsiteTab() {
         period="Dec 01 2025 – Jan 06 2026"
         color="emerald"
       />
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <KpiCard label="Total Spend"     value="€1,311.94" sub="6 weeks"                                   icon={DollarSign} />
-        <KpiCard label="Avg CTR"         value="1.74%"     sub="762 total clicks"                          icon={TrendingUp} benchmark={1.74} benchmarkValue={BENCHMARKS.ctr} />
-        <KpiCard label="Avg CPC"         value="€1.74"     sub="Across 6 weeks"                            icon={DollarSign} />
-        <KpiCard label="Total Impr."     value="67,526"    sub="6 weeks"                                   icon={Eye} />
-        <KpiCard label="Peak CTR"        value="4.84%"     sub="Week 1 · best week"                        icon={Target} />
-        <KpiCard label="CTR Trend"       value="↘ Declining" sub="From Wk1 → Wk6"                         icon={TrendingUp} benchmark={0.94} benchmarkValue={BENCHMARKS.websiteCtr} />
+
+      {/* Campaign Performance KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+        <KpiCard label="Total Spend"           value="€1,311.94"                      sub="6 weeks"                                                  icon={DollarSign} />
+        <KpiCard label="Avg CTR"               value="1.74%"                          sub="762 total clicks"   benchmark={1.74} benchmarkValue={BENCHMARKS.ctr}        icon={TrendingUp} />
+        <KpiCard label="Avg CPC"               value="€1.74"                          sub="Across 6 weeks"                                           icon={DollarSign} />
+        <KpiCard label="Total Impr."           value={totalImpressions.toLocaleString()} sub="6 weeks"                                               icon={Eye} />
+        <KpiCard label="Peak CTR"              value="4.84%"                          sub="Week 1 · best week"                                       icon={Target} />
+        <KpiCard label="CTR Trend"             value="↘ Declining"                    sub="From Wk1 → Wk6"    benchmark={0.94} benchmarkValue={BENCHMARKS.websiteCtr} icon={TrendingUp} />
+        {/* NEW: Audience Penetration */}
+        <KpiCard label="Audience Penetration"  value={audiencePenetration}             sub="Unique reach / audience size"                            icon={Users} />
       </div>
+
+      <TopCampaignsSection objective="website" />
 
       <SectionTitle><TrendingUp className="w-4 h-4 text-blue-500" /> Week-by-Week Summary</SectionTitle>
       <WeeklyTable
@@ -581,7 +817,7 @@ function WebsiteTab() {
           w.clicks,
           `€${w.spend.toFixed(2)}`,
           w.days,
-          <StatusBadge key="status" ok={w.ctr >= BENCHMARKS.ctr} />
+          <StatusBadge key="status" ok={w.ctr >= BENCHMARKS.ctr} />,
         ])}
       />
 
@@ -597,28 +833,26 @@ function WebsiteTab() {
 
 // ─── OBJECTIVE TABS CONFIG ────────────────────────────────────
 const OBJECTIVE_TABS = [
-  { id: 'engagement', label: 'Engagement',    icon: Users,         component: EngagementTab, color: 'indigo' },
-  { id: 'leads',      label: 'Lead Gen',      icon: Target,        component: LeadsTab,      color: 'blue' },
-  { id: 'video',      label: 'Video Views',   icon: Video,         component: VideoTab,      color: 'violet' },
-  { id: 'website',    label: 'Website Visits',icon: MousePointer,  component: WebsiteTab,    color: 'emerald' },
+  { id: 'engagement', label: 'Engagement',     icon: Users,        component: EngagementTab, color: 'indigo' },
+  { id: 'leads',      label: 'Lead Gen',       icon: Target,       component: LeadsTab,      color: 'blue'   },
+  { id: 'video',      label: 'Video Views',    icon: Video,        component: VideoTab,      color: 'violet' },
+  { id: 'website',    label: 'Website Visits', icon: MousePointer, component: WebsiteTab,    color: 'emerald'},
 ];
 
 const COLOR_MAP = {
   indigo:  { active: 'border-indigo-600  text-indigo-600  bg-white', dot: 'bg-indigo-500' },
-  blue:    { active: 'border-blue-600    text-blue-600    bg-white', dot: 'bg-blue-500' },
+  blue:    { active: 'border-blue-600    text-blue-600    bg-white', dot: 'bg-blue-500'   },
   violet:  { active: 'border-violet-600  text-violet-600  bg-white', dot: 'bg-violet-500' },
-  emerald: { active: 'border-emerald-600 text-emerald-600 bg-white', dot: 'bg-emerald-500' },
+  emerald: { active: 'border-emerald-600 text-emerald-600 bg-white', dot: 'bg-emerald-500'},
 };
 
 // ─── MAIN EXPORT ─────────────────────────────────────────────
 export default function ObjectiveTabs({ selectedAccounts = [], allAccounts = [], startDate, endDate, activePreset }) {
   const [activeTab, setActiveTab] = useState('engagement');
   const ActiveComponent = OBJECTIVE_TABS.find(t => t.id === activeTab)?.component ?? EngagementTab;
-  const activeColor = OBJECTIVE_TABS.find(t => t.id === activeTab)?.color ?? 'indigo';
 
   return (
     <>
-      {/* Context bar — shows selected accounts + date range */}
       <ContextBar
         selectedAccounts={selectedAccounts}
         allAccounts={allAccounts}
@@ -630,7 +864,7 @@ export default function ObjectiveTabs({ selectedAccounts = [], allAccounts = [],
       {/* Objective Tab Bar */}
       <div className="flex overflow-x-auto border-b border-gray-200 bg-gray-50">
         {OBJECTIVE_TABS.map(tab => {
-          const Icon  = tab.icon;
+          const Icon   = tab.icon;
           const active = activeTab === tab.id;
           const colors = COLOR_MAP[tab.color];
           return (

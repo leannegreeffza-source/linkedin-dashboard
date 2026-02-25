@@ -5,7 +5,7 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import {
   Search, RefreshCw, Calendar, TrendingUp, Eye, MousePointer,
   DollarSign, Target, Activity, CheckSquare, Square,
-  LayoutDashboard, Layers, ChevronDown
+  LayoutDashboard, Layers, ChevronDown, CheckCircle, AlertTriangle, Clock
 } from 'lucide-react';
 import ObjectiveTabs from './ObjectiveTabs';
 
@@ -21,6 +21,199 @@ const MAIN_TABS = [
   { id: 'summary',     label: 'Summary',                icon: LayoutDashboard },
   { id: 'performance', label: 'Performance by Objective', icon: Layers },
 ];
+
+// ─── CAMPAIGN BUDGET CONFIG (edit per campaign) ──────────────
+const CAMPAIGN_BUDGETS = [
+  {
+    id:         'C03482',
+    name:       'Pain Points | Website Visits',
+    budget:     1311.94,   // total manual budget for the period
+    currency:   '€',
+    startDate:  '2025-12-01',
+    endDate:    '2026-01-06',
+    spent:      1311.94,
+  },
+  {
+    id:         'C03482-V',
+    name:       'Cold Unaware | Video Views',
+    budget:     1400,
+    currency:   '€',
+    startDate:  '2025-12-01',
+    endDate:    '2026-01-06',
+    spent:      1360.70,
+  },
+  {
+    id:         'C03510',
+    name:       'cTrader | Lead Generation',
+    budget:     700,
+    currency:   '€',
+    startDate:  '2025-12-04',
+    endDate:    '2026-01-06',
+    spent:      636.56,
+  },
+  {
+    id:         'C02877',
+    name:       'Ben v Cornell | Engagement',
+    budget:     800,
+    currency:   '$',
+    startDate:  '2025-12-01',
+    endDate:    '2026-01-05',
+    spent:      741.46,
+  },
+];
+
+function getPacingStatus(spent, budget, startDate, endDate) {
+  const now   = new Date();
+  const start = new Date(startDate);
+  const end   = new Date(endDate);
+  const totalDays   = Math.max(1, (end - start)  / 86400000);
+  const elapsedDays = Math.min(totalDays, Math.max(0, (now - start) / 86400000));
+  const datePacing  = (elapsedDays / totalDays) * 100;
+  const spendPacing = (spent / budget) * 100;
+  const diff        = spendPacing - datePacing;
+  const onTrack     = Math.abs(diff) <= 10;
+  const ahead       = diff > 10;
+  return {
+    datePacing:   datePacing.toFixed(1),
+    spendPacing:  spendPacing.toFixed(1),
+    elapsedDays:  Math.round(elapsedDays),
+    totalDays:    Math.round(totalDays),
+    onTrack,
+    ahead,
+  };
+}
+
+function BudgetPacingCard({ campaign }) {
+  const p = getPacingStatus(campaign.spent, campaign.budget, campaign.startDate, campaign.endDate);
+  const spendPct = Math.min(100, parseFloat(p.spendPacing));
+  const datePct  = Math.min(100, parseFloat(p.datePacing));
+
+  return (
+    <div className="bg-[#0e1034] rounded-xl p-5 text-white">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1 min-w-0 pr-3">
+          <p className="text-xs font-semibold text-blue-300 uppercase tracking-wide mb-0.5">Campaign</p>
+          <p className="text-sm font-bold text-white truncate">{campaign.name}</p>
+          <p className="text-xs text-gray-400">ID: {campaign.id}</p>
+        </div>
+        {/* On-track badge */}
+        {p.onTrack ? (
+          <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold bg-green-500/20 text-green-300 border border-green-500/30 rounded-full px-2.5 py-1">
+            <CheckCircle className="w-3.5 h-3.5" /> On Track
+          </span>
+        ) : p.ahead ? (
+          <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full px-2.5 py-1">
+            <AlertTriangle className="w-3.5 h-3.5" /> Pacing Ahead
+          </span>
+        ) : (
+          <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold bg-red-500/20 text-red-300 border border-red-500/30 rounded-full px-2.5 py-1">
+            <AlertTriangle className="w-3.5 h-3.5" /> Pacing Behind
+          </span>
+        )}
+      </div>
+
+      {/* Budget row */}
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <div className="bg-white/5 rounded-lg p-3">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Current Spent</p>
+          <p className="text-xl font-bold text-white">{campaign.currency}{campaign.spent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <p className="text-xs text-gray-400">of {campaign.currency}{campaign.budget.toLocaleString()} budget</p>
+        </div>
+        <div className="bg-white/5 rounded-lg p-3">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Date Progress</p>
+          <p className="text-xl font-bold text-white">{p.elapsedDays}/{p.totalDays} days</p>
+          <p className="text-xs text-gray-400">{p.datePacing}% of period elapsed</p>
+        </div>
+      </div>
+
+      {/* Spend progress bar */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-gray-400">Spend Pacing</span>
+          <span className={`text-xs font-bold ${spendPct > datePct + 10 ? 'text-amber-300' : spendPct < datePct - 10 ? 'text-red-300' : 'text-green-300'}`}>
+            {p.spendPacing}%
+          </span>
+        </div>
+        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              spendPct > datePct + 10 ? 'bg-amber-400' : spendPct < datePct - 10 ? 'bg-red-400' : 'bg-green-400'
+            }`}
+            style={{ width: `${spendPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Date progress bar */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-gray-400">Date Pacing</span>
+          <span className="text-xs font-bold text-blue-300">{p.datePacing}%</span>
+        </div>
+        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-full rounded-full bg-blue-400 transition-all" style={{ width: `${datePct}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryTab({ selectedAccounts, allAccounts, startDate, endDate, MetricCard }) {
+  if (selectedAccounts.length === 0) {
+    return (
+      <div className="p-6 py-12 text-center">
+        <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Select Accounts to View Reports</h3>
+        <p className="text-gray-500 mb-4">Use the search and checkboxes on the left to select accounts</p>
+        <div className="inline-block bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+          <p className="text-sm text-green-700 font-medium">✅ {allAccounts.length} accounts ready</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-8">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-1">
+          {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''} Selected
+        </h2>
+        <p className="text-sm text-gray-500">Period: {startDate} → {endDate}</p>
+      </div>
+
+      {/* Aggregate Performance */}
+      <div>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Aggregate Performance</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <MetricCard label="Total Impressions" value="—" icon={Eye} />
+          <MetricCard label="Total Clicks"      value="—" icon={MousePointer} />
+          <MetricCard label="Avg CTR"           value="—" icon={TrendingUp} />
+          <MetricCard label="Total Spend"       value="—" icon={DollarSign} />
+          <MetricCard label="Avg CPC"           value="—" icon={DollarSign} />
+          <MetricCard label="Conversions"       value="—" icon={Target} />
+        </div>
+        <p className="text-xs text-gray-400 mt-4 text-center">
+          Switch to <strong>Performance by Objective</strong> to view detailed breakdowns
+        </p>
+      </div>
+
+      {/* Budgeting & Pacing */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-5 h-5 text-gray-700" />
+          <h3 className="text-lg font-bold text-gray-900">Budgeting &amp; Pacing</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {CAMPAIGN_BUDGETS.map(c => (
+            <BudgetPacingCard key={c.id} campaign={c} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -298,41 +491,13 @@ export default function Dashboard() {
 
               {/* ── Summary Tab ──────────────────────────────── */}
               {mainTab === 'summary' && (
-                <div className="p-6">
-                  {selectedAccounts.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">Select Accounts to View Reports</h3>
-                      <p className="text-gray-500 mb-4">Use the search and checkboxes on the left to select accounts</p>
-                      <div className="inline-block bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-                        <p className="text-sm text-green-700 font-medium">✅ {allAccounts.length} accounts ready</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                          {selectedAccounts.length} Account{selectedAccounts.length !== 1 ? 's' : ''} Selected
-                        </h2>
-                        <p className="text-sm text-gray-500">Period: {startDate} → {endDate}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Aggregate Performance</h3>
-                        <div className="grid grid-cols-3 gap-4">
-                          <MetricCard label="Total Impressions" value="—" icon={Eye} />
-                          <MetricCard label="Total Clicks"      value="—" icon={MousePointer} />
-                          <MetricCard label="Avg CTR"           value="—" icon={TrendingUp} />
-                          <MetricCard label="Total Spend"       value="—" icon={DollarSign} />
-                          <MetricCard label="Avg CPC"           value="—" icon={DollarSign} />
-                          <MetricCard label="Conversions"       value="—" icon={Target} />
-                        </div>
-                        <p className="text-xs text-gray-400 mt-4 text-center">
-                          Switch to <strong>Performance by Objective</strong> to view detailed breakdowns
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <SummaryTab
+                  selectedAccounts={selectedAccounts}
+                  allAccounts={allAccounts}
+                  startDate={startDate}
+                  endDate={endDate}
+                  MetricCard={MetricCard}
+                />
               )}
 
               {/* ── Performance by Objective Tab ─────────────── */}

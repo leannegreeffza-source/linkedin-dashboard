@@ -26,10 +26,9 @@ export async function POST(request) {
     const previous = calculateMetrics(previousData);
     const topCampaigns = getTopItems(currentData.campaignBreakdown, 5);
     const topAds = getTopItems(currentData.adBreakdown, 5);
-    const topCampaignGroups = getTopItems(currentData.campaignGroupBreakdown, 5);
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
 
-    return NextResponse.json({ current, previous, topCampaigns, topAds, topCampaignGroups, budgetPacing });
+    return NextResponse.json({ current, previous, topCampaigns, topAds, budgetPacing });
 
   } catch (error) {
     console.error('Analytics error:', error);
@@ -45,15 +44,12 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     impressions: 0, clicks: 0, spend: 0,
     leads: 0, likes: 0, comments: 0,
     shares: 0, follows: 0, otherEngagements: 0,
-    landingPageClicks: 0, leadFormOpens: 0,
-    videoViews: 0, videoStarts: 0, videoCompletions: 0,
     campaignBreakdown: [],
     adBreakdown: [],
-    campaignGroupBreakdown: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
-  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,videoViews,videoCompletions,videoStarts,pivotValues';
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,pivotValues';
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
@@ -118,27 +114,6 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
         aggregateData(allData, data.elements || [], 'campaign');
       }
 
-      // Campaign Group breakdown
-      const groupUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN_GROUP&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
-      const groupRes = await fetch(groupUrl, { headers });
-      if (groupRes.ok) {
-        const gdata = await groupRes.json();
-        gdata.elements?.forEach(el => {
-          const urn = el.pivotValues?.[0];
-          if (urn) {
-            allData.campaignGroupBreakdown.push({
-              id: urn.split(':').pop(),
-              impressions: el.impressions || 0,
-              clicks: el.clicks || 0,
-              spent: parseFloat(el.costInLocalCurrency || 0),
-              leads: el.oneClickLeads || 0,
-              ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-              landingPageClicks: el.landingPageClicks || 0,
-            });
-          }
-        });
-      }
-
       const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
       const adRes = await fetch(adUrl, { headers });
       if (adRes.ok) {
@@ -174,11 +149,6 @@ function aggregateData(allData, elements, type) {
     allData.shares += el.shares || 0;
     allData.follows += el.follows || 0;
     allData.otherEngagements += el.otherEngagements || 0;
-    allData.landingPageClicks += el.landingPageClicks || 0;
-    allData.leadFormOpens += el.leadGenerationMailContactInfoShares || 0;
-    allData.videoViews += el.videoViews || 0;
-    allData.videoStarts += el.videoStarts || 0;
-    allData.videoCompletions += el.videoCompletions || 0;
 
     if (urn && type === 'campaign') {
       allData.campaignBreakdown.push({
@@ -188,15 +158,13 @@ function aggregateData(allData, elements, type) {
         spent: parseFloat(el.costInLocalCurrency || 0),
         leads: el.oneClickLeads || 0,
         ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-        landingPageClicks: el.landingPageClicks || 0,
       });
     }
   });
 }
 
 function calculateMetrics(data) {
-  const { impressions, clicks, spend, leads, likes, comments, shares, follows,
-    landingPageClicks, leadFormOpens, videoViews, videoCompletions } = data;
+  const { impressions, clicks, spend, leads, likes, comments, shares, follows } = data;
   const engagements = clicks + likes + comments + shares + follows;
   return {
     impressions, clicks,
@@ -204,19 +172,11 @@ function calculateMetrics(data) {
     spent: spend,
     cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
     cpc: clicks > 0 ? spend / clicks : 0,
-    websiteVisits: landingPageClicks,
+    websiteVisits: 0,
     leads,
     cpl: leads > 0 ? spend / leads : 0,
     engagementRate: impressions > 0 ? (engagements / impressions) * 100 : 0,
-    engagements,
-    landingPageClicks,
-    landingPageCTR: impressions > 0 ? (landingPageClicks / impressions) * 100 : 0,
-    leadFormOpens,
-    leadFormCompletionRate: leadFormOpens > 0 ? (leads / leadFormOpens) * 100 : 0,
-    videoViews,
-    videoViewRate: impressions > 0 ? (videoViews / impressions) * 100 : 0,
-    cpv: videoViews > 0 ? spend / videoViews : 0,
-    videoCompletionRate: videoViews > 0 ? (videoCompletions / videoViews) * 100 : 0,
+    engagements
   };
 }
 

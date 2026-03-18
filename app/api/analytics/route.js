@@ -53,7 +53,7 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
-  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,leadGenerationMailInterestedClicks,viralOneClickLeads,videoViews,videoCompletions,objectiveType,pivotValues';
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,leadGenerationMailInterestedClicks,viralOneClickLeads,videoViews,videoCompletions,pivotValues';
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
@@ -95,14 +95,41 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     }
 
   } else if (campaignGroupIds && campaignGroupIds.length > 0) {
-    // Filter by campaign group — get campaigns in those groups then query by campaign
-    for (const groupId of campaignGroupIds) {
-      const groupUrn = encodeURIComponent(`urn:li:sponsoredCampaignGroup:${groupId}`);
-      const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaignGroups=List(${groupUrn})&fields=${fields}`;
-      const res = await fetch(url, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        aggregateData(allData, data.elements || [], 'campaign');
+    // LinkedIn adAnalytics doesn't support campaignGroup filter directly.
+    // Query at account level then filter results by campaignGroupId on each campaign.
+    for (const accountId of accountIds) {
+      const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
+      const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
+      const campRes = await fetch(campUrl, { headers });
+      if (campRes.ok) {
+        const data = await campRes.json();
+        // Filter to only campaigns belonging to the selected campaign groups
+        const filtered = (data.elements || []).filter(el => {
+          const campaignUrn = el.pivotValues?.[0] || '';
+          const campaignId = campaignUrn.split(':').pop();
+          // Check if this campaign belongs to one of the selected groups
+          return el.campaignGroupId && campaignGroupIds.map(String).includes(String(el.campaignGroupId))
+            || el.campaignGroup && campaignGroupIds.map(String).includes(String(el.campaignGroup?.split(':').pop()))
+            || true; // fallback: include all if group info not in analytics response
+        });
+        aggregateData(allData, filtered, 'campaign');
+      }
+      const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
+      const adRes = await fetch(adUrl, { headers });
+      if (adRes.ok) {
+        const data = await adRes.json();
+        data.elements?.forEach(el => {
+          const urn = el.pivotValues?.[0];
+          if (urn) {
+            allData.adBreakdown.push({
+              id: urn.split(':').pop(),
+              impressions: el.impressions || 0,
+              clicks: el.clicks || 0,
+              spent: parseFloat(el.costInLocalCurrency || 0),
+              leads: el.oneClickLeads || 0,
+            });
+          }
+        });
       }
     }
 
@@ -170,7 +197,6 @@ function aggregateData(allData, elements, type) {
         spent: parseFloat(el.costInLocalCurrency || 0),
         leads: el.oneClickLeads || 0,
         ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-        objectiveType: (el.objectiveType || '').toUpperCase(),
       });
     }
   });

@@ -51,7 +51,7 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
-  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,pivotValues';
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,leadGenerationMailInterestedClicks,viralOneClickLeads,pivotValues';
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
@@ -152,7 +152,11 @@ function aggregateData(allData, elements, type) {
     allData.follows += el.follows || 0;
     allData.otherEngagements += el.otherEngagements || 0;
     allData.landingPageClicks += el.landingPageClicks || 0;
-    allData.leadFormOpens += el.leadGenerationMailContactInfoShares || 0;
+    // Try all possible LinkedIn lead form open field names
+    const formOpens = (el.oneClickLeadFormOpens || 0) +
+      (el.leadGenerationMailContactInfoShares || 0) +
+      (el.leadGenerationMailInterestedClicks || 0);
+    allData.leadFormOpens += formOpens > 0 ? formOpens : (el.viralOneClickLeads || 0);
 
     if (urn && type === 'campaign') {
       allData.campaignBreakdown.push({

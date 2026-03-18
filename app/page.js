@@ -1061,7 +1061,7 @@ export default function Dashboard() {
     { id: 'engagement',  label: 'Engagement',        icon: Zap,         types: ['ENGAGEMENT','BRAND_AWARENESS','SPONSORED_UPDATES'],
       metrics: ['impressions','clicks','ctr','cpc','landingPageClicks','landingPageCTR','engagementRate','engagements'] },
     { id: 'leads',       label: 'Lead Generation',   icon: Users,       types: ['LEAD_GENERATION','SPONSORED_INMAILS'],
-      metrics: ['impressions','clicks','ctr','spent','leads','cpl'] },
+      metrics: ['impressions','clicks','ctr','spent','leads','cpl','leadFormOpens','leadFormCompletionRate'] },
     { id: 'video',       label: 'Video Views',       icon: Video,       types: ['VIDEO_VIEWS','SPONSORED_VIDEO'],
       metrics: ['impressions','clicks','ctr','spent','cpm','cpc'] },
     { id: 'website',     label: 'Website Visits',    icon: Globe,       types: ['WEBSITE_VISITS','WEBSITE_CONVERSIONS'],
@@ -1091,6 +1091,8 @@ export default function Dashboard() {
     { label: 'Website Visits',  key: 'websiteVisits',   format: 'number',  icon: Target,       prefix: '' },
     { label: 'Leads',           key: 'leads',           format: 'number',  icon: Users,        prefix: '' },
     { label: 'CPL (USD)',       key: 'cpl',             format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'Lead Form Opens',       key: 'leadFormOpens',          format: 'number',  icon: Users,        prefix: '' },
+    { label: 'Lead Form Completion',  key: 'leadFormCompletionRate', format: 'percent', icon: TrendingUp,   prefix: '' },
     { label: 'Engagement Rate', key: 'engagementRate',  format: 'percent', icon: TrendingUp,   prefix: '' },
     { label: 'Engagements',     key: 'engagements',     format: 'number',  icon: Users,        prefix: '' },
   ];

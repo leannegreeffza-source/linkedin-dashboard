@@ -25,26 +25,33 @@ export async function POST(request) {
     const current = calculateMetrics(currentData);
     const previous = calculateMetrics(previousData);
 
-    // Fetch real names for all IDs in the breakdowns
+    // Collect unique IDs from breakdown
     const allCampaignIds = [...new Set(currentData.campaignBreakdown.map(c => c.id))];
-    const allGroupIds = [...new Set(currentData.campaignGroupBreakdown.map(g => g.id))];
-    const allAdIds = [...new Set(currentData.adBreakdown.map(a => a.id))];
+    const allGroupIds    = [...new Set(currentData.campaignGroupBreakdown.map(g => g.id))];
+    const allAdIds       = [...new Set(currentData.adBreakdown.map(a => a.id))];
 
-    const [campaignNames, groupNames, adNames] = await Promise.all([
-      fetchNames(allCampaignIds, 'adCampaigns', headers),
+    // Fetch names AND objectiveType for campaigns, names for groups/ads
+    const [campaignDetails, groupNames, adNames] = await Promise.all([
+      fetchCampaignDetails(allCampaignIds, headers),
       fetchNames(allGroupIds, 'adCampaignGroups', headers),
       fetchNames(allAdIds, 'adCreatives', headers),
     ]);
 
-    // Attach names to breakdown items
+    // Attach names + objectiveType to campaign breakdown items
     const topCampaigns = getTopItems(currentData.campaignBreakdown, 10).map(c => ({
-      ...c, name: campaignNames[c.id] || `Campaign ${c.id}`
+      ...c,
+      name: campaignDetails[c.id]?.name || `Campaign ${c.id}`,
+      objectiveType: (campaignDetails[c.id]?.objectiveType || '').toUpperCase(),
     }));
+
     const topAds = getTopItems(currentData.adBreakdown, 10).map(a => ({
-      ...a, name: adNames[a.id] || `Ad ${a.id}`
+      ...a,
+      name: adNames[a.id] || `Ad ${a.id}`,
     }));
+
     const topCampaignGroups = getTopItems(currentData.campaignGroupBreakdown, 10).map(g => ({
-      ...g, name: groupNames[g.id] || `Campaign Group ${g.id}`
+      ...g,
+      name: groupNames[g.id] || `Campaign Group ${g.id}`,
     }));
 
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
@@ -57,20 +64,39 @@ export async function POST(request) {
   }
 }
 
-// Fetch names for a list of IDs from a LinkedIn REST endpoint
+// Fetch name + objectiveType for campaign IDs
+async function fetchCampaignDetails(ids, headers) {
+  const map = {};
+  if (!ids.length) return map;
+  await Promise.all(ids.map(async id => {
+    try {
+      const res = await fetch(`https://api.linkedin.com/rest/adCampaigns/${id}`, { headers });
+      if (res.ok) {
+        const d = await res.json();
+        map[id] = {
+          name: d.name || null,
+          objectiveType: d.objectiveType || '',
+        };
+      }
+    } catch (e) {}
+  }));
+  return map;
+}
+
+// Fetch names only
 async function fetchNames(ids, resource, headers) {
-  const nameMap = {};
-  if (!ids.length) return nameMap;
+  const map = {};
+  if (!ids.length) return map;
   await Promise.all(ids.map(async id => {
     try {
       const res = await fetch(`https://api.linkedin.com/rest/${resource}/${id}`, { headers });
       if (res.ok) {
         const d = await res.json();
-        nameMap[id] = d.name || d.title || d.campaignName || null;
+        map[id] = d.name || d.title || null;
       }
     } catch (e) {}
   }));
-  return nameMap;
+  return map;
 }
 
 async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds, dateRange, headers) {
@@ -81,13 +107,9 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     impressions: 0, clicks: 0, spend: 0,
     leads: 0, likes: 0, comments: 0,
     shares: 0, follows: 0, otherEngagements: 0,
-    landingPageClicks: 0,
-    leadFormOpens: 0,
-    videoViews: 0,
-    videoCompletions: 0,
-    campaignBreakdown: [],
-    adBreakdown: [],
-    campaignGroupBreakdown: [],
+    landingPageClicks: 0, leadFormOpens: 0,
+    videoViews: 0, videoCompletions: 0,
+    campaignBreakdown: [], adBreakdown: [], campaignGroupBreakdown: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
@@ -95,67 +117,23 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
-    const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&creatives=List(${creativeUrns})&fields=${fields}`;
-    const res = await fetch(url, { headers });
-    if (res.ok) {
-      const data = await res.json();
-      aggregateData(allData, data.elements || [], 'ad');
-    }
+    const res = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&creatives=List(${creativeUrns})&fields=${fields}`, { headers });
+    if (res.ok) aggregateData(allData, (await res.json()).elements || [], 'ad');
 
   } else if (campaignIds && campaignIds.length > 0) {
     const campaignUrns = campaignIds.map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`)).join(',');
-
-    const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
-    const campRes = await fetch(campUrl, { headers });
-    if (campRes.ok) {
-      const data = await campRes.json();
-      aggregateData(allData, data.elements || [], 'campaign');
-    }
-
-    const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
-    const adRes = await fetch(adUrl, { headers });
-    if (adRes.ok) {
-      const data = await adRes.json();
-      data.elements?.forEach(el => {
-        const urn = el.pivotValues?.[0];
-        if (urn) {
-          allData.adBreakdown.push({
-            id: urn.split(':').pop(),
-            impressions: el.impressions || 0,
-            clicks: el.clicks || 0,
-            spent: parseFloat(el.costInLocalCurrency || 0),
-            leads: el.oneClickLeads || 0,
-          });
-        }
-      });
-    }
+    const campRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`, { headers });
+    if (campRes.ok) aggregateData(allData, (await campRes.json()).elements || [], 'campaign');
+    const adRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`, { headers });
+    if (adRes.ok) aggregateData(allData, (await adRes.json()).elements || [], 'ad');
 
   } else if (campaignGroupIds && campaignGroupIds.length > 0) {
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
-      const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
-      const campRes = await fetch(campUrl, { headers });
-      if (campRes.ok) {
-        const data = await campRes.json();
-        aggregateData(allData, data.elements || [], 'campaign');
-      }
-      const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
-      const adRes = await fetch(adUrl, { headers });
-      if (adRes.ok) {
-        const data = await adRes.json();
-        data.elements?.forEach(el => {
-          const urn = el.pivotValues?.[0];
-          if (urn) {
-            allData.adBreakdown.push({
-              id: urn.split(':').pop(),
-              impressions: el.impressions || 0,
-              clicks: el.clicks || 0,
-              spent: parseFloat(el.costInLocalCurrency || 0),
-              leads: el.oneClickLeads || 0,
-            });
-          }
-        });
-      }
+      const campRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
+      if (campRes.ok) aggregateData(allData, (await campRes.json()).elements || [], 'campaign');
+      const adRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
+      if (adRes.ok) aggregateData(allData, (await adRes.json()).elements || [], 'ad');
     }
 
   } else {
@@ -163,51 +141,25 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
 
       // Campaign Group breakdown
-      const groupUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN_GROUP&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
-      const groupRes = await fetch(groupUrl, { headers });
+      const groupRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN_GROUP&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
       if (groupRes.ok) {
-        const gdata = await groupRes.json();
-        (gdata.elements || []).forEach(el => {
+        (await groupRes.json()).elements?.forEach(el => {
           const urn = el.pivotValues?.[0];
-          if (urn) {
-            allData.campaignGroupBreakdown.push({
-              id: urn.split(':').pop(),
-              impressions: el.impressions || 0,
-              clicks: el.clicks || 0,
-              spent: parseFloat(el.costInLocalCurrency || 0),
-              leads: el.oneClickLeads || 0,
-              ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-              landingPageClicks: el.landingPageClicks || 0,
-              videoViews: el.videoViews || 0,
-            });
-          }
+          if (urn) allData.campaignGroupBreakdown.push({
+            id: urn.split(':').pop(),
+            impressions: el.impressions || 0, clicks: el.clicks || 0,
+            spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
+            ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
+            landingPageClicks: el.landingPageClicks || 0, videoViews: el.videoViews || 0,
+          });
         });
       }
 
-      const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
-      const campRes = await fetch(campUrl, { headers });
-      if (campRes.ok) {
-        const data = await campRes.json();
-        aggregateData(allData, data.elements || [], 'campaign');
-      }
+      const campRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
+      if (campRes.ok) aggregateData(allData, (await campRes.json()).elements || [], 'campaign');
 
-      const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
-      const adRes = await fetch(adUrl, { headers });
-      if (adRes.ok) {
-        const data = await adRes.json();
-        data.elements?.forEach(el => {
-          const urn = el.pivotValues?.[0];
-          if (urn) {
-            allData.adBreakdown.push({
-              id: urn.split(':').pop(),
-              impressions: el.impressions || 0,
-              clicks: el.clicks || 0,
-              spent: parseFloat(el.costInLocalCurrency || 0),
-              leads: el.oneClickLeads || 0,
-            });
-          }
-        });
-      }
+      const adRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
+      if (adRes.ok) aggregateData(allData, (await adRes.json()).elements || [], 'ad');
     }
   }
 
@@ -229,33 +181,28 @@ function aggregateData(allData, elements, type) {
     allData.landingPageClicks += el.landingPageClicks || 0;
     allData.videoViews += el.videoViews || 0;
     allData.videoCompletions += el.videoCompletions || 0;
-    const formOpens = (el.oneClickLeadFormOpens || 0) +
-      (el.leadGenerationMailContactInfoShares || 0) +
-      (el.leadGenerationMailInterestedClicks || 0);
+    const formOpens = (el.oneClickLeadFormOpens || 0) + (el.leadGenerationMailContactInfoShares || 0) + (el.leadGenerationMailInterestedClicks || 0);
     allData.leadFormOpens += formOpens > 0 ? formOpens : (el.viralOneClickLeads || 0);
 
     if (urn && type === 'campaign') {
       allData.campaignBreakdown.push({
         id: urn.split(':').pop(),
-        impressions: el.impressions || 0,
-        clicks: el.clicks || 0,
-        spent: parseFloat(el.costInLocalCurrency || 0),
-        leads: el.oneClickLeads || 0,
+        impressions: el.impressions || 0, clicks: el.clicks || 0,
+        spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
         ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
+        landingPageClicks: el.landingPageClicks || 0,
+        videoViews: el.videoViews || 0,
+        videoCompletions: el.videoCompletions || 0,
       });
     }
     if (urn && type === 'ad') {
       allData.adBreakdown.push({
         id: urn.split(':').pop(),
-        impressions: el.impressions || 0,
-        clicks: el.clicks || 0,
-        spent: parseFloat(el.costInLocalCurrency || 0),
-        leads: el.oneClickLeads || 0,
+        impressions: el.impressions || 0, clicks: el.clicks || 0,
+        spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
         ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-        likes: el.likes || 0,
-        comments: el.comments || 0,
-        shares: el.shares || 0,
-        follows: el.follows || 0,
+        likes: el.likes || 0, comments: el.comments || 0,
+        shares: el.shares || 0, follows: el.follows || 0,
         otherEngagements: el.otherEngagements || 0,
       });
     }

@@ -1131,12 +1131,21 @@ export default function Dashboard() {
 
   const activeTabConfig = OBJECTIVE_TABS.find(t => t.id === activeObjectiveTab) || OBJECTIVE_TABS[0];
 
-  // Filter topCampaigns by objective type for the active tab
-  // Uses objectiveType stored directly on campaign item (from analytics API) OR from sidebar campaignObjectiveMap
+  // Filter topCampaigns by objectiveType — uses value fetched from LinkedIn API on each item
   const filteredTopCampaigns = activeTabConfig.types === null
     ? (reportData?.topCampaigns || [])
     : (reportData?.topCampaigns || []).filter(c => {
         const obj = (c.objectiveType || campaignObjectiveMap[String(c.id)] || '').toUpperCase();
+        return activeTabConfig.types.some(t => obj.includes(t));
+      });
+
+  // Also filter topAds by parent campaign objectiveType
+  const filteredTopAds = activeTabConfig.types === null
+    ? (reportData?.topAds || [])
+    : (reportData?.topAds || []).filter(a => {
+        const obj = (a.objectiveType || campaignObjectiveMap[String(a.campaignId)] || '').toUpperCase();
+        // If no objectiveType on ad, include all (ads don't have their own objective)
+        if (!obj) return true;
         return activeTabConfig.types.some(t => obj.includes(t));
       });
 
@@ -1330,7 +1339,7 @@ export default function Dashboard() {
                         const count = tab.types === null
                           ? (reportData?.topCampaigns?.length || 0)
                           : (reportData?.topCampaigns || []).filter(c => {
-                              const obj = campaignObjectiveMap[String(c.id)] || '';
+                              const obj = (c.objectiveType || campaignObjectiveMap[String(c.id)] || '').toUpperCase();
                               return tab.types.some(t => obj.includes(t));
                             }).length;
 
@@ -1385,7 +1394,7 @@ export default function Dashboard() {
                     <div className="mb-6">
                       <TopPerformingBlock
                         title={`Ad Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
-                        items={reportData.topAds || []}
+                        items={filteredTopAds}
                         accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
                     </div>
                   ) : selectedCampaigns.length > 0 ? (
@@ -1400,7 +1409,7 @@ export default function Dashboard() {
                         <div className="mb-6">
                           <TopPerformingBlock
                             title={`Ad & Set Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
-                            items={reportData.topAds}
+                            items={filteredTopAds}
                             accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
                         </div>
                       )}

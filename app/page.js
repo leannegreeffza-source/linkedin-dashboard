@@ -178,8 +178,10 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
     return `${base}/campaigns`;
   }
 
-  function getName(id) {
-    return nameMap?.[String(id)] || `${type === 'campaign' ? 'Campaign' : 'Ad'} ${id}`;
+  function getName(id, item) {
+    // Priority: name stored on item > nameMap from sidebar > fallback
+    if (item?.name && !item.name.startsWith('Campaign ') && !item.name.startsWith('Ad ') && !item.name.startsWith('Campaign Group ')) return item.name;
+    return nameMap?.[String(id)] || item?.name || `${type === 'campaign' ? 'Campaign' : type === 'group' ? 'Campaign Group' : 'Ad'} ${id}`;
   }
 
   if (type === 'ad') {
@@ -204,7 +206,7 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
             </thead>
             <tbody>
               {items.map(item => {
-                const name = getName(item.id);
+                const name = getName(item.id, item);
                 const ctr = item.impressions > 0 ? (item.clicks / item.impressions * 100).toFixed(2) : '0.00';
                 const engagements = (item.clicks || 0) + (item.likes || 0) + (item.comments || 0) + (item.shares || 0) + (item.follows || 0);
                 const engRate = item.impressions > 0 ? (engagements / item.impressions * 100).toFixed(2) : '0.00';
@@ -267,7 +269,7 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
                   <td className="py-3 px-2">
                     <a href={getUrl(item.id)} target="_blank" rel="noopener noreferrer"
                       className="text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1">
-                      <span className="truncate max-w-xs">{getName(item.id)}</span>
+                      <span className="truncate max-w-xs">{getName(item.id, item)}</span>
                       <ExternalLink className="w-3 h-3 flex-shrink-0" />
                     </a>
                     <div className="text-slate-500 font-mono text-xs mt-0.5">ID: {item.id}</div>
@@ -295,7 +297,7 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
             <div className="flex items-start justify-between gap-2 mb-1">
               <a href={getUrl(item.id)} target="_blank" rel="noopener noreferrer"
                 className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 min-w-0">
-                <span className="truncate">{getName(item.id)}</span>
+                <span className="truncate">{getName(item.id, item)}</span>
                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
               </a>
               <span className="text-xs text-slate-500 flex-shrink-0">#{i + 1}</span>

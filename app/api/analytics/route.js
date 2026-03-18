@@ -24,9 +24,29 @@ export async function POST(request) {
 
     const current = calculateMetrics(currentData);
     const previous = calculateMetrics(previousData);
-    const topCampaigns = getTopItems(currentData.campaignBreakdown, 10);
-    const topAds = getTopItems(currentData.adBreakdown, 10);
-    const topCampaignGroups = getTopItems(currentData.campaignGroupBreakdown, 10);
+
+    // Fetch real names for all IDs in the breakdowns
+    const allCampaignIds = [...new Set(currentData.campaignBreakdown.map(c => c.id))];
+    const allGroupIds = [...new Set(currentData.campaignGroupBreakdown.map(g => g.id))];
+    const allAdIds = [...new Set(currentData.adBreakdown.map(a => a.id))];
+
+    const [campaignNames, groupNames, adNames] = await Promise.all([
+      fetchNames(allCampaignIds, 'adCampaigns', headers),
+      fetchNames(allGroupIds, 'adCampaignGroups', headers),
+      fetchNames(allAdIds, 'adCreatives', headers),
+    ]);
+
+    // Attach names to breakdown items
+    const topCampaigns = getTopItems(currentData.campaignBreakdown, 10).map(c => ({
+      ...c, name: campaignNames[c.id] || `Campaign ${c.id}`
+    }));
+    const topAds = getTopItems(currentData.adBreakdown, 10).map(a => ({
+      ...a, name: adNames[a.id] || `Ad ${a.id}`
+    }));
+    const topCampaignGroups = getTopItems(currentData.campaignGroupBreakdown, 10).map(g => ({
+      ...g, name: groupNames[g.id] || `Campaign Group ${g.id}`
+    }));
+
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
 
     return NextResponse.json({ current, previous, topCampaigns, topAds, topCampaignGroups, budgetPacing });
@@ -35,6 +55,22 @@ export async function POST(request) {
     console.error('Analytics error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+// Fetch names for a list of IDs from a LinkedIn REST endpoint
+async function fetchNames(ids, resource, headers) {
+  const nameMap = {};
+  if (!ids.length) return nameMap;
+  await Promise.all(ids.map(async id => {
+    try {
+      const res = await fetch(`https://api.linkedin.com/rest/${resource}/${id}`, { headers });
+      if (res.ok) {
+        const d = await res.json();
+        nameMap[id] = d.name || d.title || d.campaignName || null;
+      }
+    } catch (e) {}
+  }));
+  return nameMap;
 }
 
 async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds, dateRange, headers) {
@@ -69,7 +105,6 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
   } else if (campaignIds && campaignIds.length > 0) {
     const campaignUrns = campaignIds.map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`)).join(',');
 
-    // Get campaign-level breakdown
     const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
     const campRes = await fetch(campUrl, { headers });
     if (campRes.ok) {
@@ -77,7 +112,6 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
       aggregateData(allData, data.elements || [], 'campaign');
     }
 
-    // Also get ad-level breakdown
     const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`;
     const adRes = await fetch(adUrl, { headers });
     if (adRes.ok) {
@@ -97,24 +131,13 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     }
 
   } else if (campaignGroupIds && campaignGroupIds.length > 0) {
-    // LinkedIn adAnalytics doesn't support campaignGroup filter directly.
-    // Query at account level then filter results by campaignGroupId on each campaign.
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
       const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
       const campRes = await fetch(campUrl, { headers });
       if (campRes.ok) {
         const data = await campRes.json();
-        // Filter to only campaigns belonging to the selected campaign groups
-        const filtered = (data.elements || []).filter(el => {
-          const campaignUrn = el.pivotValues?.[0] || '';
-          const campaignId = campaignUrn.split(':').pop();
-          // Check if this campaign belongs to one of the selected groups
-          return el.campaignGroupId && campaignGroupIds.map(String).includes(String(el.campaignGroupId))
-            || el.campaignGroup && campaignGroupIds.map(String).includes(String(el.campaignGroup?.split(':').pop()))
-            || true; // fallback: include all if group info not in analytics response
-        });
-        aggregateData(allData, filtered, 'campaign');
+        aggregateData(allData, data.elements || [], 'campaign');
       }
       const adUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
       const adRes = await fetch(adUrl, { headers });
@@ -136,7 +159,6 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     }
 
   } else {
-    // Account level
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
 
@@ -207,7 +229,6 @@ function aggregateData(allData, elements, type) {
     allData.landingPageClicks += el.landingPageClicks || 0;
     allData.videoViews += el.videoViews || 0;
     allData.videoCompletions += el.videoCompletions || 0;
-    // Try all possible LinkedIn lead form open field names
     const formOpens = (el.oneClickLeadFormOpens || 0) +
       (el.leadGenerationMailContactInfoShares || 0) +
       (el.leadGenerationMailInterestedClicks || 0);
@@ -221,6 +242,21 @@ function aggregateData(allData, elements, type) {
         spent: parseFloat(el.costInLocalCurrency || 0),
         leads: el.oneClickLeads || 0,
         ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
+      });
+    }
+    if (urn && type === 'ad') {
+      allData.adBreakdown.push({
+        id: urn.split(':').pop(),
+        impressions: el.impressions || 0,
+        clicks: el.clicks || 0,
+        spent: parseFloat(el.costInLocalCurrency || 0),
+        leads: el.oneClickLeads || 0,
+        ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
+        likes: el.likes || 0,
+        comments: el.comments || 0,
+        shares: el.shares || 0,
+        follows: el.follows || 0,
+        otherEngagements: el.otherEngagements || 0,
       });
     }
   });
@@ -252,9 +288,7 @@ function calculateMetrics(data) {
 }
 
 function getTopItems(items, count) {
-  return [...items]
-    .sort((a, b) => b.impressions - a.impressions)
-    .slice(0, count);
+  return [...items].sort((a, b) => b.impressions - a.impressions).slice(0, count);
 }
 
 function calculateBudgetPacing(data, dateRange) {

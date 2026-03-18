@@ -24,11 +24,12 @@ export async function POST(request) {
 
     const current = calculateMetrics(currentData);
     const previous = calculateMetrics(previousData);
-    const topCampaigns = getTopItems(currentData.campaignBreakdown, 5);
-    const topAds = getTopItems(currentData.adBreakdown, 5);
+    const topCampaigns = getTopItems(currentData.campaignBreakdown, 10);
+    const topAds = getTopItems(currentData.adBreakdown, 10);
+    const topCampaignGroups = getTopItems(currentData.campaignGroupBreakdown, 10);
     const budgetPacing = calculateBudgetPacing(currentData, currentRange);
 
-    return NextResponse.json({ current, previous, topCampaigns, topAds, budgetPacing });
+    return NextResponse.json({ current, previous, topCampaigns, topAds, topCampaignGroups, budgetPacing });
 
   } catch (error) {
     console.error('Analytics error:', error);
@@ -50,6 +51,7 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     videoCompletions: 0,
     campaignBreakdown: [],
     adBreakdown: [],
+    campaignGroupBreakdown: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
@@ -137,6 +139,28 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     // Account level
     for (const accountId of accountIds) {
       const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
+
+      // Campaign Group breakdown
+      const groupUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN_GROUP&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
+      const groupRes = await fetch(groupUrl, { headers });
+      if (groupRes.ok) {
+        const gdata = await groupRes.json();
+        (gdata.elements || []).forEach(el => {
+          const urn = el.pivotValues?.[0];
+          if (urn) {
+            allData.campaignGroupBreakdown.push({
+              id: urn.split(':').pop(),
+              impressions: el.impressions || 0,
+              clicks: el.clicks || 0,
+              spent: parseFloat(el.costInLocalCurrency || 0),
+              leads: el.oneClickLeads || 0,
+              ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
+              landingPageClicks: el.landingPageClicks || 0,
+              videoViews: el.videoViews || 0,
+            });
+          }
+        });
+      }
 
       const campUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`;
       const campRes = await fetch(campUrl, { headers });

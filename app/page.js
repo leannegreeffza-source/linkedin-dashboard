@@ -174,6 +174,7 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
   function getUrl(id) {
     const base = `https://www.linkedin.com/campaignmanager/accounts/${accountId}`;
     if (type === 'campaign') return `${base}/campaigns/${id}`;
+    if (type === 'group') return `${base}/campaignGroups/${id}`;
     return `${base}/campaigns`;
   }
 
@@ -243,6 +244,48 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
     );
   }
 
+  if (type === 'group') {
+    return (
+      <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-4">{title}</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-600">
+                <th className="text-left pb-2 px-2 text-slate-400 font-semibold">Campaign Group</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Impressions</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Clicks</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">CTR</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Spent (USD)</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Leads</th>
+                <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Landing Pg Clicks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(items || []).map(item => (
+                <tr key={item.id} className="border-b border-slate-700 hover:bg-slate-700/30">
+                  <td className="py-3 px-2">
+                    <a href={getUrl(item.id)} target="_blank" rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1">
+                      <span className="truncate max-w-xs">{getName(item.id)}</span>
+                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    </a>
+                    <div className="text-slate-500 font-mono text-xs mt-0.5">ID: {item.id}</div>
+                  </td>
+                  <td className="py-3 px-2 text-right text-white font-medium">{(item.impressions||0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-white font-medium">{(item.clicks||0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-emerald-400 font-medium">{item.ctr||'0.00'}%</td>
+                  <td className="py-3 px-2 text-right text-white font-medium">${(item.spent||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                  <td className="py-3 px-2 text-right text-white font-medium">{item.leads||0}</td>
+                  <td className="py-3 px-2 text-right text-white font-medium">{(item.landingPageClicks||0).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
       <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-4">{title}</h3>
@@ -1048,6 +1091,7 @@ export default function Dashboard() {
 
   const campaignNameMap = Object.fromEntries(campaigns.map(c => [String(c.id), c.name]));
   const adNameMap = Object.fromEntries(ads.map(a => [String(a.id), a.name]));
+  const campaignGroupNameMap = Object.fromEntries(campaignGroups.map(g => [String(g.id), g.name]));
   const primaryAccountId = selectedAccounts[0];
 
   // Map campaign ID → objectiveType for tab filtering
@@ -1323,17 +1367,44 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Top Campaigns — filtered by active tab */}
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <TopPerformingBlock
-                      title={activeObjectiveTab === 'all' ? 'Top Campaigns' : `Top ${activeTabConfig.label} Campaigns`}
-                      items={filteredTopCampaigns}
-                      accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
-                  </div>
-                  {reportData.topAds && reportData.topAds.length > 0 && (
+                  {/* Breakdown — context-aware based on sidebar selection */}
+                  {selectedAds.length > 0 ? (
                     <div className="mb-6">
-                      <TopPerformingBlock title="Top Performing Ads" items={reportData.topAds}
+                      <TopPerformingBlock
+                        title={`Ad Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                        items={reportData.topAds || []}
                         accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
+                    </div>
+                  ) : selectedCampaigns.length > 0 ? (
+                    <>
+                      <div className="mb-6">
+                        <TopPerformingBlock
+                          title={`Campaign Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                          items={filteredTopCampaigns}
+                          accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
+                      </div>
+                      {reportData.topAds && reportData.topAds.length > 0 && (
+                        <div className="mb-6">
+                          <TopPerformingBlock
+                            title={`Ad & Set Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                            items={reportData.topAds}
+                            accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
+                        </div>
+                      )}
+                    </>
+                  ) : selectedCampaignGroups.length > 0 ? (
+                    <div className="mb-6">
+                      <TopPerformingBlock
+                        title={`Campaign Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                        items={filteredTopCampaigns}
+                        accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
+                    </div>
+                  ) : (
+                    <div className="mb-6">
+                      <TopPerformingBlock
+                        title={`Campaign Group Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                        items={reportData.topCampaignGroups || []}
+                        accountId={primaryAccountId} type="group" nameMap={campaignGroupNameMap} />
                     </div>
                   )}
 

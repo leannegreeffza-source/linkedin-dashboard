@@ -53,7 +53,7 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
-  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,leadGenerationMailInterestedClicks,viralOneClickLeads,videoViews,videoCompletions,pivotValues';
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,leadGenerationMailInterestedClicks,viralOneClickLeads,videoViews,videoCompletions,objectiveType,pivotValues';
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
@@ -170,6 +170,7 @@ function aggregateData(allData, elements, type) {
         spent: parseFloat(el.costInLocalCurrency || 0),
         leads: el.oneClickLeads || 0,
         ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
+        objectiveType: (el.objectiveType || '').toUpperCase(),
       });
     }
   });

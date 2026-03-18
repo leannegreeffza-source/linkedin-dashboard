@@ -1058,23 +1058,28 @@ export default function Dashboard() {
   const OBJECTIVE_TABS = [
     { id: 'all',         label: 'All',              icon: BarChart2,   types: null,
       metrics: ['impressions','clicks','ctr','spent','cpm','cpc','landingPageCTR','websiteVisits','leads','cpl','videoViewRate','cpv','engagementRate','engagements'] },
-    { id: 'engagement',  label: 'Engagement',        icon: Zap,         types: ['ENGAGEMENT','BRAND_AWARENESS','SPONSORED_UPDATES'],
+    { id: 'engagement',  label: 'Engagement',        icon: Zap,
+      types: ['ENGAGEMENT','BRAND_AWARENESS','REACH','SPONSORED_UPDATES','AWARENESS'],
       metrics: ['impressions','clicks','ctr','cpc','landingPageClicks','landingPageCTR','engagementRate','engagements'] },
-    { id: 'leads',       label: 'Lead Generation',   icon: Users,       types: ['LEAD_GENERATION','SPONSORED_INMAILS'],
+    { id: 'leads',       label: 'Lead Generation',   icon: Users,
+      types: ['LEAD_GENERATION','SPONSORED_INMAILS','LEAD_GEN_FORMS','INMAIL'],
       metrics: ['impressions','clicks','ctr','spent','leads','cpl','leadFormOpens','leadFormCompletionRate'] },
-    { id: 'video',       label: 'Video Views',       icon: Video,       types: ['VIDEO_VIEWS','SPONSORED_VIDEO'],
-      metrics: ['impressions','clicks','ctr','spent','cpm','cpc'] },
-    { id: 'website',     label: 'Website Visits',    icon: Globe,       types: ['WEBSITE_VISITS','WEBSITE_CONVERSIONS'],
-      metrics: ['impressions','clicks','ctr','spent','cpm','cpc','websiteVisits'] },
+    { id: 'video',       label: 'Video Views',       icon: Video,
+      types: ['VIDEO_VIEWS','SPONSORED_VIDEO'],
+      metrics: ['impressions','clicks','ctr','spent','cpc','videoViews','videoViewRate','cpv','videoCompletionRate'] },
+    { id: 'website',     label: 'Website Visits',    icon: Globe,
+      types: ['WEBSITE_VISITS','WEBSITE_CONVERSIONS','WEBSITE_TRAFFIC','WEBSITE_CONVERSION'],
+      metrics: ['impressions','clicks','ctr','spent','cpm','cpc','landingPageCTR','websiteVisits'] },
   ];
 
   const activeTabConfig = OBJECTIVE_TABS.find(t => t.id === activeObjectiveTab) || OBJECTIVE_TABS[0];
 
   // Filter topCampaigns by objective type for the active tab
+  // Uses objectiveType stored directly on campaign item (from analytics API) OR from sidebar campaignObjectiveMap
   const filteredTopCampaigns = activeTabConfig.types === null
     ? (reportData?.topCampaigns || [])
     : (reportData?.topCampaigns || []).filter(c => {
-        const obj = campaignObjectiveMap[String(c.id)] || '';
+        const obj = (c.objectiveType || campaignObjectiveMap[String(c.id)] || '').toUpperCase();
         return activeTabConfig.types.some(t => obj.includes(t));
       });
 

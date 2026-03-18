@@ -598,6 +598,17 @@ function AIReportModal({ show, onClose, generatingReport, reportData, reportResu
             <p className="text-gray-800 font-semibold text-xl">Analyzing your campaigns...</p>
             <p className="text-gray-400 text-sm mt-2">This may take 15-30 seconds</p>
           </div>
+        ) : reportResult?.error ? (
+          <div className="flex flex-col items-center justify-center py-32 bg-white">
+            <div className="text-5xl mb-4">⚠️</div>
+            <p className="text-gray-800 font-semibold text-xl mb-2">Report generation failed</p>
+            <p className="text-gray-500 text-sm max-w-md text-center">{reportResult.error}</p>
+            <button onClick={onClose} className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Close</button>
+          </div>
+        ) : !reportResult ? (
+          <div className="flex flex-col items-center justify-center py-32 bg-white">
+            <p className="text-gray-400 text-sm">Click AI Report to generate your campaign analysis.</p>
+          </div>
         ) : report ? (
           <div ref={reportRef} style={{fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", background: '#f4fbff', padding: '20px'}}>
             <div style={{maxWidth: '100%', margin: '0 auto', background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', overflow: 'hidden'}}>

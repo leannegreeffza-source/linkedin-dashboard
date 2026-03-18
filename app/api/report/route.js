@@ -68,8 +68,8 @@ Return this exact JSON structure (fill in all values based on the data):
 }`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 2000,
+      model: 'claude-sonnet-4-5',
+      max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }],
     });
 

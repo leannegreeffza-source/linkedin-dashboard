@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Search, TrendingUp, TrendingDown, DollarSign, MousePointer, Eye, Target, Users, RefreshCw, ChevronDown, Calendar, ExternalLink } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, DollarSign, MousePointer, Eye, Target, Users, RefreshCw, ChevronDown, Calendar, ExternalLink, Layers, Video, Globe, Zap, BarChart2 } from 'lucide-react';
 
 function DateRangePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -878,6 +878,7 @@ export default function Dashboard() {
   const [reportData, setReportData] = useState(null);
   const [exchangeRate, setExchangeRate] = useState(18.5);
   const [manualBudget, setManualBudget] = useState('');
+  const [activeObjectiveTab, setActiveObjectiveTab] = useState('all');
   const [campaignStart, setCampaignStart] = useState('');
   const [campaignEnd, setCampaignEnd] = useState('');
 
@@ -1049,6 +1050,53 @@ export default function Dashboard() {
   const adNameMap = Object.fromEntries(ads.map(a => [String(a.id), a.name]));
   const primaryAccountId = selectedAccounts[0];
 
+  // Map campaign ID → objectiveType for tab filtering
+  const campaignObjectiveMap = Object.fromEntries(
+    campaigns.map(c => [String(c.id), (c.objectiveType || c.type || '').toUpperCase()])
+  );
+
+  const OBJECTIVE_TABS = [
+    { id: 'all',         label: 'All',              icon: BarChart2,   types: null,
+      metrics: ['impressions','clicks','ctr','spent','cpm','cpc','websiteVisits','leads','cpl','engagementRate','engagements'] },
+    { id: 'engagement',  label: 'Engagement',        icon: Zap,         types: ['ENGAGEMENT','BRAND_AWARENESS','SPONSORED_UPDATES'],
+      metrics: ['impressions','clicks','ctr','cpc','landingPageClicks','landingPageCTR','engagementRate','engagements'] },
+    { id: 'leads',       label: 'Lead Generation',   icon: Users,       types: ['LEAD_GENERATION','SPONSORED_INMAILS'],
+      metrics: ['impressions','clicks','ctr','spent','leads','cpl'] },
+    { id: 'video',       label: 'Video Views',       icon: Video,       types: ['VIDEO_VIEWS','SPONSORED_VIDEO'],
+      metrics: ['impressions','clicks','ctr','spent','cpm','cpc'] },
+    { id: 'website',     label: 'Website Visits',    icon: Globe,       types: ['WEBSITE_VISITS','WEBSITE_CONVERSIONS'],
+      metrics: ['impressions','clicks','ctr','spent','cpm','cpc','websiteVisits'] },
+  ];
+
+  const activeTabConfig = OBJECTIVE_TABS.find(t => t.id === activeObjectiveTab) || OBJECTIVE_TABS[0];
+
+  // Filter topCampaigns by objective type for the active tab
+  const filteredTopCampaigns = activeTabConfig.types === null
+    ? (reportData?.topCampaigns || [])
+    : (reportData?.topCampaigns || []).filter(c => {
+        const obj = campaignObjectiveMap[String(c.id)] || '';
+        return activeTabConfig.types.some(t => obj.includes(t));
+      });
+
+  // All metrics config (used to selectively show per tab)
+  const ALL_METRICS = [
+    { label: 'Impressions',     key: 'impressions',     format: 'number',  icon: Eye,          prefix: '' },
+    { label: 'Clicks',          key: 'clicks',          format: 'number',  icon: MousePointer, prefix: '' },
+    { label: 'CTR',             key: 'ctr',             format: 'percent', icon: TrendingUp,   prefix: '' },
+    { label: 'Spent (USD)',     key: 'spent',           format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'CPM (USD)',       key: 'cpm',             format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'CPC (USD)',       key: 'cpc',             format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'Landing Page Clicks', key: 'landingPageClicks', format: 'number',  icon: MousePointer, prefix: '' },
+    { label: 'Landing Page CTR',    key: 'landingPageCTR',    format: 'percent', icon: TrendingUp,   prefix: '' },
+    { label: 'Website Visits',  key: 'websiteVisits',   format: 'number',  icon: Target,       prefix: '' },
+    { label: 'Leads',           key: 'leads',           format: 'number',  icon: Users,        prefix: '' },
+    { label: 'CPL (USD)',       key: 'cpl',             format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'Engagement Rate', key: 'engagementRate',  format: 'percent', icon: TrendingUp,   prefix: '' },
+    { label: 'Engagements',     key: 'engagements',     format: 'number',  icon: Users,        prefix: '' },
+  ];
+
+  const visibleMetrics = ALL_METRICS.filter(m => activeTabConfig.metrics.includes(m.key));
+
   const filteredAccounts = accounts.filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || String(a.id).includes(accountSearch));
   const filteredGroups = campaignGroups.filter(g => !campaignGroupSearch || g.name.toLowerCase().includes(campaignGroupSearch.toLowerCase()) || String(g.id).includes(campaignGroupSearch));
   const filteredCampaigns = campaigns.filter(c => !campaignSearch || c.name.toLowerCase().includes(campaignSearch.toLowerCase()) || String(c.id).includes(campaignSearch));
@@ -1208,32 +1256,71 @@ export default function Dashboard() {
                     <p className="text-slate-400 text-sm">Period: {currentRange.start} to {currentRange.end} | Compare: {previousRange.start} to {previousRange.end}</p>
                   </div>
 
-                  <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
-                    <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
-                    <div className="grid grid-cols-4 gap-4">
-                      {[
-                        { label: 'Impressions', key: 'impressions', format: 'number', icon: Eye, prefix: '' },
-                        { label: 'Clicks', key: 'clicks', format: 'number', icon: MousePointer, prefix: '' },
-                        { label: 'CTR', key: 'ctr', format: 'percent', icon: TrendingUp, prefix: '' },
-                        { label: 'Spent (USD)', key: 'spent', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'CPM (USD)', key: 'cpm', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'CPC (USD)', key: 'cpc', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'Website Visits', key: 'websiteVisits', format: 'number', icon: Target, prefix: '' },
-                        { label: 'Leads', key: 'leads', format: 'number', icon: Users, prefix: '' },
-                        { label: 'CPL (USD)', key: 'cpl', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp, prefix: '' },
-                        { label: 'Engagements', key: 'engagements', format: 'number', icon: Users, prefix: '' },
-                      ].map(metric => (
-                        <MetricCard key={metric.key} label={metric.label}
-                          current={reportData.current[metric.key]}
-                          previous={reportData.previous[metric.key]}
-                          format={metric.format} icon={metric.icon} prefix={metric.prefix} />
-                      ))}
+                  {/* ── Objective Tabs ── */}
+                  <div className="bg-slate-800 rounded-xl border border-slate-700 mb-6 overflow-hidden">
+                    <div className="flex overflow-x-auto border-b border-slate-700">
+                      {OBJECTIVE_TABS.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = activeObjectiveTab === tab.id;
+                        // Count campaigns for this tab
+                        const count = tab.types === null
+                          ? (reportData?.topCampaigns?.length || 0)
+                          : (reportData?.topCampaigns || []).filter(c => {
+                              const obj = campaignObjectiveMap[String(c.id)] || '';
+                              return tab.types.some(t => obj.includes(t));
+                            }).length;
+
+                        const activeColors = {
+                          all:        'border-blue-500    text-blue-400    bg-blue-950/40',
+                          engagement: 'border-yellow-500  text-yellow-400  bg-yellow-950/40',
+                          leads:      'border-purple-500  text-purple-400  bg-purple-950/40',
+                          video:      'border-rose-500    text-rose-400    bg-rose-950/40',
+                          website:    'border-emerald-500 text-emerald-400 bg-emerald-950/40',
+                        };
+
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setActiveObjectiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${
+                              isActive
+                                ? `${activeColors[tab.id]} border-b-2`
+                                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-700/50'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            {tab.label}
+                            {count > 0 && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                                isActive ? 'bg-slate-700 text-white' : 'bg-slate-700 text-slate-400'
+                              }`}>
+                                {count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Campaign Performance Metrics */}
+                    <div className="p-6">
+                      <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
+                      <div className="grid grid-cols-4 gap-4">
+                        {visibleMetrics.map(metric => (
+                          <MetricCard key={metric.key} label={metric.label}
+                            current={reportData.current[metric.key]}
+                            previous={reportData.previous[metric.key]}
+                            format={metric.format} icon={metric.icon} prefix={metric.prefix} />
+                        ))}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Top Campaigns — filtered by active tab */}
                   <div className="grid grid-cols-2 gap-6 mb-6">
-                    <TopPerformingBlock title="Top Campaigns" items={reportData.topCampaigns}
+                    <TopPerformingBlock
+                      title={activeObjectiveTab === 'all' ? 'Top Campaigns' : `Top ${activeTabConfig.label} Campaigns`}
+                      items={filteredTopCampaigns}
                       accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
                   </div>
                   {reportData.topAds && reportData.topAds.length > 0 && (

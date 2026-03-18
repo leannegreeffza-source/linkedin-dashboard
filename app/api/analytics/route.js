@@ -46,12 +46,14 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     shares: 0, follows: 0, otherEngagements: 0,
     landingPageClicks: 0,
     leadFormOpens: 0,
+    videoViews: 0,
+    videoCompletions: 0,
     campaignBreakdown: [],
     adBreakdown: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
-  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,leadGenerationMailInterestedClicks,viralOneClickLeads,pivotValues';
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,leadGenerationMailInterestedClicks,viralOneClickLeads,videoViews,videoCompletions,pivotValues';
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
@@ -152,6 +154,8 @@ function aggregateData(allData, elements, type) {
     allData.follows += el.follows || 0;
     allData.otherEngagements += el.otherEngagements || 0;
     allData.landingPageClicks += el.landingPageClicks || 0;
+    allData.videoViews += el.videoViews || 0;
+    allData.videoCompletions += el.videoCompletions || 0;
     // Try all possible LinkedIn lead form open field names
     const formOpens = (el.oneClickLeadFormOpens || 0) +
       (el.leadGenerationMailContactInfoShares || 0) +
@@ -172,7 +176,7 @@ function aggregateData(allData, elements, type) {
 }
 
 function calculateMetrics(data) {
-  const { impressions, clicks, spend, leads, likes, comments, shares, follows, landingPageClicks, leadFormOpens } = data;
+  const { impressions, clicks, spend, leads, likes, comments, shares, follows, landingPageClicks, leadFormOpens, videoViews, videoCompletions } = data;
   const engagements = clicks + likes + comments + shares + follows;
   return {
     impressions, clicks,
@@ -189,6 +193,10 @@ function calculateMetrics(data) {
     landingPageCTR: impressions > 0 ? (landingPageClicks / impressions) * 100 : 0,
     leadFormOpens,
     leadFormCompletionRate: leadFormOpens > 0 ? (leads / leadFormOpens) * 100 : 0,
+    videoViews,
+    videoViewRate: impressions > 0 ? (videoViews / impressions) * 100 : 0,
+    cpv: videoViews > 0 ? spend / videoViews : 0,
+    videoCompletionRate: videoViews > 0 ? (videoCompletions / videoViews) * 100 : 0,
   };
 }
 

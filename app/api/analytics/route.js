@@ -122,48 +122,59 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
 
   } else if (campaignIds && campaignIds.length > 0) {
     const campaignUrns = campaignIds.map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`)).join(',');
-    // Totals from campaign pivot only
     const campRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`, { headers });
     if (campRes.ok) aggregateData(allData, (await campRes.json()).elements || [], 'campaign');
-    // Ad breakdown only — does NOT re-add to totals
     const adRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`, { headers });
-    if (adRes.ok) {
-      (await adRes.json()).elements?.forEach(el => {
-        const urn = el.pivotValues?.[0];
-        if (urn) allData.adBreakdown.push({
-          id: urn.split(':').pop(),
-          impressions: el.impressions || 0, clicks: el.clicks || 0,
-          spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
-          ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-          likes: el.likes || 0, comments: el.comments || 0,
-          shares: el.shares || 0, follows: el.follows || 0,
-          otherEngagements: el.otherEngagements || 0,
-        });
-      });
-    }
+    if (adRes.ok) aggregateData(allData, (await adRes.json()).elements || [], 'ad');
 
   } else if (campaignGroupIds && campaignGroupIds.length > 0) {
-    // Step 1: get campaign IDs that belong to the selected groups
-    const groupCampaignIds = [];
+    // Get campaign IDs for the selected groups using 3-method fallback
+    let groupCampaignIds = [];
+
+    // Method 1: search campaigns by group URN
     for (const groupId of campaignGroupIds) {
       try {
+        const groupUrn = encodeURIComponent(`urn:li:sponsoredCampaignGroup:${groupId}`);
         const res = await fetch(
-          `https://api.linkedin.com/rest/adCampaigns?q=search&search.campaignGroup.values[0]=${encodeURIComponent(`urn:li:sponsoredCampaignGroup:${groupId}`)}&count=100&fields=id`,
+          `https://api.linkedin.com/rest/adCampaigns?q=search&search.campaignGroup.values[0]=${groupUrn}&count=100&fields=id`,
           { headers }
         );
         if (res.ok) {
           const d = await res.json();
-          (d.elements || []).forEach(c => { if (!groupCampaignIds.includes(c.id)) groupCampaignIds.push(c.id); });
+          (d.elements || []).forEach(c => {
+            if (c.id && !groupCampaignIds.includes(c.id)) groupCampaignIds.push(c.id);
+          });
         }
       } catch (e) {}
     }
 
+    // Method 2: list all account campaigns and filter by campaignGroup field
+    if (groupCampaignIds.length === 0) {
+      for (const accountId of accountIds) {
+        try {
+          const accountUrn = `urn:li:sponsoredAccount:${accountId}`;
+          const res = await fetch(
+            `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${encodeURIComponent(accountUrn)}&count=100&fields=id,campaignGroup`,
+            { headers }
+          );
+          if (res.ok) {
+            const d = await res.json();
+            (d.elements || []).forEach(c => {
+              const gId = String(c.campaignGroup || '').split(':').pop();
+              if (campaignGroupIds.map(String).includes(gId)) {
+                if (!groupCampaignIds.includes(c.id)) groupCampaignIds.push(c.id);
+              }
+            });
+          }
+        } catch (e) {}
+      }
+    }
+
     if (groupCampaignIds.length > 0) {
-      // Step 2: query analytics only for those campaigns — totals from campaign pivot only
+      // Query analytics only for the campaigns in the selected groups
       const campaignUrns = groupCampaignIds.map(id => encodeURIComponent(`urn:li:sponsoredCampaign:${id}`)).join(',');
       const campRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`, { headers });
       if (campRes.ok) aggregateData(allData, (await campRes.json()).elements || [], 'campaign');
-      // Ad breakdown only — does NOT re-add to totals (adBreakdown list only)
       const adRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&campaigns=List(${campaignUrns})&fields=${fields}`, { headers });
       if (adRes.ok) {
         (await adRes.json()).elements?.forEach(el => {
@@ -179,130 +190,26 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
           });
         });
       }
-    }
-
-  } else {
-    for (const accountId of accountIds) {
-      const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
-
-      // Campaign Group breakdown
-      const groupRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN_GROUP&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
-      if (groupRes.ok) {
-        (await groupRes.json()).elements?.forEach(el => {
-          const urn = el.pivotValues?.[0];
-          if (urn) allData.campaignGroupBreakdown.push({
-            id: urn.split(':').pop(),
-            impressions: el.impressions || 0, clicks: el.clicks || 0,
-            spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
-            ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-            landingPageClicks: el.landingPageClicks || 0, videoViews: el.videoViews || 0,
+    } else {
+      // Method 3: fallback — query full account (group filter unavailable via API)
+      for (const accountId of accountIds) {
+        const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${accountId}`);
+        const campRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
+        if (campRes.ok) aggregateData(allData, (await campRes.json()).elements || [], 'campaign');
+        const adRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
+        if (adRes.ok) {
+          (await adRes.json()).elements?.forEach(el => {
+            const urn = el.pivotValues?.[0];
+            if (urn) allData.adBreakdown.push({
+              id: urn.split(':').pop(),
+              impressions: el.impressions || 0, clicks: el.clicks || 0,
+              spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
+              ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
+              likes: el.likes || 0, comments: el.comments || 0,
+              shares: el.shares || 0, follows: el.follows || 0,
+              otherEngagements: el.otherEngagements || 0,
+            });
           });
-        });
+        }
       }
-
-      // Totals from campaign pivot only
-      const campRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
-      if (campRes.ok) aggregateData(allData, (await campRes.json()).elements || [], 'campaign');
-
-      // Ad breakdown only — does NOT re-add to totals
-      const adRes = await fetch(`https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CREATIVE&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn})&fields=${fields}`, { headers });
-      if (adRes.ok) {
-        (await adRes.json()).elements?.forEach(el => {
-          const urn = el.pivotValues?.[0];
-          if (urn) allData.adBreakdown.push({
-            id: urn.split(':').pop(),
-            impressions: el.impressions || 0, clicks: el.clicks || 0,
-            spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
-            ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-            likes: el.likes || 0, comments: el.comments || 0,
-            shares: el.shares || 0, follows: el.follows || 0,
-            otherEngagements: el.otherEngagements || 0,
-          });
-        });
-      }
-    }
-  }
-
-  return allData;
-}
-
-function aggregateData(allData, elements, type) {
-  elements.forEach(el => {
-    const urn = el.pivotValues?.[0];
-    allData.impressions += el.impressions || 0;
-    allData.clicks += el.clicks || 0;
-    allData.spend += parseFloat(el.costInLocalCurrency || 0);
-    allData.leads += el.oneClickLeads || 0;
-    allData.likes += el.likes || 0;
-    allData.comments += el.comments || 0;
-    allData.shares += el.shares || 0;
-    allData.follows += el.follows || 0;
-    allData.otherEngagements += el.otherEngagements || 0;
-    allData.landingPageClicks += el.landingPageClicks || 0;
-    allData.videoViews += el.videoViews || 0;
-    allData.videoCompletions += el.videoCompletions || 0;
-    const formOpens = (el.oneClickLeadFormOpens || 0) + (el.leadGenerationMailContactInfoShares || 0) + (el.leadGenerationMailInterestedClicks || 0);
-    allData.leadFormOpens += formOpens > 0 ? formOpens : (el.viralOneClickLeads || 0);
-
-    if (urn && type === 'campaign') {
-      allData.campaignBreakdown.push({
-        id: urn.split(':').pop(),
-        impressions: el.impressions || 0, clicks: el.clicks || 0,
-        spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
-        ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-        landingPageClicks: el.landingPageClicks || 0,
-        videoViews: el.videoViews || 0,
-        videoCompletions: el.videoCompletions || 0,
-      });
-    }
-    if (urn && type === 'ad') {
-      allData.adBreakdown.push({
-        id: urn.split(':').pop(),
-        impressions: el.impressions || 0, clicks: el.clicks || 0,
-        spent: parseFloat(el.costInLocalCurrency || 0), leads: el.oneClickLeads || 0,
-        ctr: el.impressions > 0 ? ((el.clicks / el.impressions) * 100).toFixed(2) : '0.00',
-        likes: el.likes || 0, comments: el.comments || 0,
-        shares: el.shares || 0, follows: el.follows || 0,
-        otherEngagements: el.otherEngagements || 0,
-      });
-    }
-  });
-}
-
-function calculateMetrics(data) {
-  const { impressions, clicks, spend, leads, likes, comments, shares, follows, landingPageClicks, leadFormOpens, videoViews, videoCompletions } = data;
-  const engagements = clicks + likes + comments + shares + follows;
-  return {
-    impressions, clicks,
-    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
-    spent: spend,
-    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
-    cpc: clicks > 0 ? spend / clicks : 0,
-    websiteVisits: landingPageClicks,
-    leads,
-    cpl: leads > 0 ? spend / leads : 0,
-    engagementRate: impressions > 0 ? (engagements / impressions) * 100 : 0,
-    engagements,
-    landingPageClicks,
-    landingPageCTR: impressions > 0 ? (landingPageClicks / impressions) * 100 : 0,
-    leadFormOpens,
-    leadFormCompletionRate: leadFormOpens > 0 ? (leads / leadFormOpens) * 100 : 0,
-    videoViews,
-    videoViewRate: impressions > 0 ? (videoViews / impressions) * 100 : 0,
-    cpv: videoViews > 0 ? spend / videoViews : 0,
-    videoCompletionRate: videoViews > 0 ? (videoCompletions / videoViews) * 100 : 0,
-  };
-}
-
-function getTopItems(items, count) {
-  return [...items].sort((a, b) => b.impressions - a.impressions).slice(0, count);
-}
-
-function calculateBudgetPacing(data, dateRange) {
-  const startDate = new Date(dateRange.start);
-  const endDate = new Date(dateRange.end);
-  const today = new Date();
-  const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-  const elapsedDays = Math.min(Math.ceil((today - startDate) / (1000 * 60 * 60 * 24)), totalDays);
-  return { budget: 0, spent: data.spend, daysTotal: totalDays, daysElapsed: elapsedDays };
-}
+    }}

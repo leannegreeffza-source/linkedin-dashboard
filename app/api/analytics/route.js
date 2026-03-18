@@ -44,12 +44,13 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     impressions: 0, clicks: 0, spend: 0,
     leads: 0, likes: 0, comments: 0,
     shares: 0, follows: 0, otherEngagements: 0,
+    landingPageClicks: 0,
     campaignBreakdown: [],
     adBreakdown: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
-  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,pivotValues';
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,pivotValues';
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
@@ -149,6 +150,7 @@ function aggregateData(allData, elements, type) {
     allData.shares += el.shares || 0;
     allData.follows += el.follows || 0;
     allData.otherEngagements += el.otherEngagements || 0;
+    allData.landingPageClicks += el.landingPageClicks || 0;
 
     if (urn && type === 'campaign') {
       allData.campaignBreakdown.push({
@@ -164,7 +166,7 @@ function aggregateData(allData, elements, type) {
 }
 
 function calculateMetrics(data) {
-  const { impressions, clicks, spend, leads, likes, comments, shares, follows } = data;
+  const { impressions, clicks, spend, leads, likes, comments, shares, follows, landingPageClicks } = data;
   const engagements = clicks + likes + comments + shares + follows;
   return {
     impressions, clicks,
@@ -172,11 +174,13 @@ function calculateMetrics(data) {
     spent: spend,
     cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
     cpc: clicks > 0 ? spend / clicks : 0,
-    websiteVisits: 0,
+    websiteVisits: landingPageClicks,
     leads,
     cpl: leads > 0 ? spend / leads : 0,
     engagementRate: impressions > 0 ? (engagements / impressions) * 100 : 0,
-    engagements
+    engagements,
+    landingPageClicks,
+    landingPageCTR: impressions > 0 ? (landingPageClicks / impressions) * 100 : 0,
   };
 }
 

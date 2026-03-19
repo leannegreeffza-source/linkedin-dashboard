@@ -112,13 +112,15 @@ async function fetchPeriodData(accountIds, campaignGroupIds, campaignIds, adIds,
     impressions: 0, clicks: 0, spend: 0,
     leads: 0, likes: 0, comments: 0,
     shares: 0, follows: 0, otherEngagements: 0,
+    landingPageClicks: 0, leadFormOpens: 0,
+    videoViews: 0, videoCompletions: 0,
     campaignBreakdown: [],
     adBreakdown: [],
   };
 
   const dateRangeParam = `dateRange=(start:(year:${parseInt(sy)},month:${parseInt(sm)},day:${parseInt(sd)}),end:(year:${parseInt(ey)},month:${parseInt(em)},day:${parseInt(ed)}))`;
   // Added otherEngagements to fields
-  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,pivotValues';
+  const fields = 'impressions,clicks,costInLocalCurrency,oneClickLeads,likes,comments,shares,follows,otherEngagements,landingPageClicks,leadGenerationMailContactInfoShares,oneClickLeadFormOpens,videoViews,videoCompletions,pivotValues';
 
   if (adIds && adIds.length > 0) {
     const creativeUrns = adIds.map(id => encodeURIComponent(`urn:li:sponsoredCreative:${id}`)).join(',');
@@ -248,6 +250,11 @@ function aggregateData(allData, elements, type) {
     allData.shares += el.shares || 0;
     allData.follows += el.follows || 0;
     allData.otherEngagements += el.otherEngagements || 0;
+    allData.landingPageClicks += el.landingPageClicks || 0;
+    allData.videoViews += el.videoViews || 0;
+    allData.videoCompletions += el.videoCompletions || 0;
+    const formOpens = (el.oneClickLeadFormOpens || 0) + (el.leadGenerationMailContactInfoShares || 0);
+    allData.leadFormOpens += formOpens;
 
     if (urn && type === 'campaign') {
       allData.campaignBreakdown.push({
@@ -263,7 +270,8 @@ function aggregateData(allData, elements, type) {
 }
 
 function calculateMetrics(data) {
-  const { impressions, clicks, spend, leads, likes, comments, shares, follows, otherEngagements } = data;
+  const { impressions, clicks, spend, leads, likes, comments, shares, follows,
+    otherEngagements, landingPageClicks, leadFormOpens, videoViews, videoCompletions } = data;
   const engagements = clicks + likes + comments + shares + follows;
   return {
     impressions, clicks,
@@ -271,12 +279,20 @@ function calculateMetrics(data) {
     spent: spend,
     cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
     cpc: clicks > 0 ? spend / clicks : 0,
-    websiteVisits: 0,
+    websiteVisits: landingPageClicks,
     leads,
     cpl: leads > 0 ? spend / leads : 0,
     engagementRate: impressions > 0 ? (engagements / impressions) * 100 : 0,
     engagements,
     likes, comments, shares, follows, otherEngagements,
+    landingPageClicks,
+    landingPageCTR: impressions > 0 ? (landingPageClicks / impressions) * 100 : 0,
+    leadFormOpens,
+    leadFormCompletionRate: leadFormOpens > 0 ? (leads / leadFormOpens) * 100 : 0,
+    videoViews,
+    videoViewRate: impressions > 0 ? (videoViews / impressions) * 100 : 0,
+    cpv: videoViews > 0 ? spend / videoViews : 0,
+    videoCompletionRate: videoViews > 0 ? (videoCompletions / videoViews) * 100 : 0,
   };
 }
 

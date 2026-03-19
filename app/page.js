@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Search, TrendingUp, TrendingDown, DollarSign, MousePointer, Eye, Target, Users, RefreshCw, ChevronDown, Calendar, ExternalLink } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, DollarSign, MousePointer, Eye, Target, Users, RefreshCw, ChevronDown, Calendar, ExternalLink, BarChart2, Zap, Video, Globe, Layers } from 'lucide-react';
 
 function DateRangePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -174,11 +174,13 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
   function getUrl(id) {
     const base = `https://www.linkedin.com/campaignmanager/accounts/${accountId}`;
     if (type === 'campaign') return `${base}/campaigns/${id}`;
+    if (type === 'group') return `${base}/campaignGroups/${id}`;
     return `${base}/campaigns`;
   }
 
-  function getName(id) {
-    return nameMap?.[String(id)] || `${type === 'campaign' ? 'Campaign' : 'Ad'} ${id}`;
+  function getName(id, item) {
+    if (item?.name && !item.name.match(/^(Campaign|Ad|Campaign Group) \d+$/)) return item.name;
+    return nameMap?.[String(id)] || item?.name || `${type === 'campaign' ? 'Campaign' : type === 'group' ? 'Campaign Group' : 'Ad'} ${id}`;
   }
 
   if (type === 'ad') {
@@ -203,7 +205,7 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
             </thead>
             <tbody>
               {items.map(item => {
-                const name = getName(item.id);
+                const name = getName(item.id, item);
                 const ctr = item.impressions > 0 ? (item.clicks / item.impressions * 100).toFixed(2) : '0.00';
                 const engagements = (item.clicks || 0) + (item.likes || 0) + (item.comments || 0) + (item.shares || 0) + (item.follows || 0);
                 const engRate = item.impressions > 0 ? (engagements / item.impressions * 100).toFixed(2) : '0.00';
@@ -243,6 +245,52 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
     );
   }
 
+  if (type === 'group') {
+    return (
+      <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-4">{title}</h3>
+        {(!items || items.length === 0) ? (
+          <p className="text-slate-400 text-sm text-center py-6">No campaign group data available</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-600">
+                  <th className="text-left pb-2 px-2 text-slate-400 font-semibold">Campaign Group</th>
+                  <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Impressions</th>
+                  <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Clicks</th>
+                  <th className="text-right pb-2 px-2 text-slate-400 font-semibold">CTR</th>
+                  <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Spent (USD)</th>
+                  <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Leads</th>
+                  <th className="text-right pb-2 px-2 text-slate-400 font-semibold">Landing Pg Clicks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(item => (
+                  <tr key={item.id} className="border-b border-slate-700 hover:bg-slate-700/30">
+                    <td className="py-3 px-2">
+                      <a href={getUrl(item.id)} target="_blank" rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1">
+                        <span className="truncate max-w-xs">{getName(item.id, item)}</span>
+                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                      </a>
+                      <div className="text-slate-500 font-mono text-xs mt-0.5">ID: {item.id}</div>
+                    </td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{(item.impressions||0).toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{(item.clicks||0).toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right text-emerald-400 font-medium">{item.ctr||'0.00'}%</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">${(item.spent||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{item.leads||0}</td>
+                    <td className="py-3 px-2 text-right text-white font-medium">{(item.landingPageClicks||0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
       <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-4">{title}</h3>
@@ -252,7 +300,7 @@ function TopPerformingBlock({ title, items, accountId, type, nameMap }) {
             <div className="flex items-start justify-between gap-2 mb-1">
               <a href={getUrl(item.id)} target="_blank" rel="noopener noreferrer"
                 className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 min-w-0">
-                <span className="truncate">{getName(item.id)}</span>
+                <span className="truncate">{getName(item.id, item)}</span>
                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
               </a>
               <span className="text-xs text-slate-500 flex-shrink-0">#{i + 1}</span>
@@ -873,6 +921,7 @@ export default function Dashboard() {
   const [selectedAds, setSelectedAds] = useState([]);
   const [adSearch, setAdSearch] = useState('');
   const [loadingAds, setLoadingAds] = useState(false);
+  const [activeObjectiveTab, setActiveObjectiveTab] = useState('all');
 
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
@@ -1047,6 +1096,60 @@ export default function Dashboard() {
 
   const campaignNameMap = Object.fromEntries(campaigns.map(c => [String(c.id), c.name]));
   const adNameMap = Object.fromEntries(ads.map(a => [String(a.id), a.name]));
+  const campaignGroupNameMap = Object.fromEntries(campaignGroups.map(g => [String(g.id), g.name]));
+
+  const campaignObjectiveMap = Object.fromEntries(
+    campaigns.map(c => [String(c.id), (c.objectiveType || '').toUpperCase()])
+  );
+
+  const OBJECTIVE_TABS = [
+    { id: 'all',        label: 'All',             icon: BarChart2, types: null,
+      metrics: ['impressions','clicks','ctr','spent','cpm','cpc','landingPageCTR','websiteVisits','leads','cpl','videoViewRate','cpv','engagementRate','engagements'] },
+    { id: 'engagement', label: 'Engagement',       icon: Zap,       types: ['ENGAGEMENT','BRAND_AWARENESS','REACH','AWARENESS'],
+      metrics: ['impressions','clicks','ctr','cpc','landingPageClicks','landingPageCTR','engagementRate','engagements'] },
+    { id: 'leads',      label: 'Lead Generation',  icon: Users,     types: ['LEAD_GENERATION','LEAD_GEN_FORMS','INMAIL'],
+      metrics: ['impressions','clicks','ctr','spent','leads','cpl','leadFormOpens','leadFormCompletionRate'] },
+    { id: 'video',      label: 'Video Views',      icon: Video,     types: ['VIDEO_VIEWS','SPONSORED_VIDEO'],
+      metrics: ['impressions','clicks','ctr','spent','cpc','videoViews','videoViewRate','cpv','videoCompletionRate'] },
+    { id: 'website',    label: 'Website Visits',   icon: Globe,     types: ['WEBSITE_VISITS','WEBSITE_CONVERSIONS','WEBSITE_TRAFFIC'],
+      metrics: ['impressions','clicks','ctr','spent','cpm','cpc','landingPageCTR','websiteVisits'] },
+  ];
+
+  const activeTabConfig = OBJECTIVE_TABS.find(t => t.id === activeObjectiveTab) || OBJECTIVE_TABS[0];
+
+  const filteredTopCampaigns = activeTabConfig.types === null
+    ? (reportData?.topCampaigns || [])
+    : (reportData?.topCampaigns || []).filter(c => {
+        const obj = (c.objectiveType || campaignObjectiveMap[String(c.id)] || '').toUpperCase();
+        return activeTabConfig.types.some(t => obj.includes(t));
+      });
+
+  const filteredTopAds = reportData?.topAds || [];
+
+  const ALL_METRICS = [
+    { label: 'Impressions',           key: 'impressions',           format: 'number',  icon: Eye,          prefix: '' },
+    { label: 'Clicks',                key: 'clicks',                format: 'number',  icon: MousePointer, prefix: '' },
+    { label: 'CTR',                   key: 'ctr',                   format: 'percent', icon: TrendingUp,   prefix: '' },
+    { label: 'Spent (USD)',           key: 'spent',                 format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'CPM (USD)',             key: 'cpm',                   format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'CPC (USD)',             key: 'cpc',                   format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'Landing Page Clicks',   key: 'landingPageClicks',     format: 'number',  icon: MousePointer, prefix: '' },
+    { label: 'Landing Page CTR',      key: 'landingPageCTR',        format: 'percent', icon: TrendingUp,   prefix: '' },
+    { label: 'Website Visits',        key: 'websiteVisits',         format: 'number',  icon: Target,       prefix: '' },
+    { label: 'Leads',                 key: 'leads',                 format: 'number',  icon: Users,        prefix: '' },
+    { label: 'CPL (USD)',             key: 'cpl',                   format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'Lead Form Opens',       key: 'leadFormOpens',         format: 'number',  icon: Users,        prefix: '' },
+    { label: 'Lead Form Completion',  key: 'leadFormCompletionRate',format: 'percent', icon: TrendingUp,   prefix: '' },
+    { label: 'Engagement Rate',       key: 'engagementRate',        format: 'percent', icon: TrendingUp,   prefix: '' },
+    { label: 'Engagements',           key: 'engagements',           format: 'number',  icon: Users,        prefix: '' },
+    { label: 'Video Views',           key: 'videoViews',            format: 'number',  icon: Video,        prefix: '' },
+    { label: 'Video View Rate',       key: 'videoViewRate',         format: 'percent', icon: Video,        prefix: '' },
+    { label: 'CPV (USD)',             key: 'cpv',                   format: 'decimal', icon: DollarSign,   prefix: '$' },
+    { label: 'Video Completion Rate', key: 'videoCompletionRate',   format: 'percent', icon: Video,        prefix: '' },
+  ];
+
+  const visibleMetrics = ALL_METRICS.filter(m => activeTabConfig.metrics.includes(m.key));
+
   const primaryAccountId = selectedAccounts[0];
 
   const filteredAccounts = accounts.filter(a => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()) || String(a.id).includes(accountSearch));
@@ -1208,38 +1311,92 @@ export default function Dashboard() {
                     <p className="text-slate-400 text-sm">Period: {currentRange.start} to {currentRange.end} | Compare: {previousRange.start} to {previousRange.end}</p>
                   </div>
 
-                  <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
-                    <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
-                    <div className="grid grid-cols-4 gap-4">
-                      {[
-                        { label: 'Impressions', key: 'impressions', format: 'number', icon: Eye, prefix: '' },
-                        { label: 'Clicks', key: 'clicks', format: 'number', icon: MousePointer, prefix: '' },
-                        { label: 'CTR', key: 'ctr', format: 'percent', icon: TrendingUp, prefix: '' },
-                        { label: 'Spent (USD)', key: 'spent', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'CPM (USD)', key: 'cpm', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'CPC (USD)', key: 'cpc', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'Website Visits', key: 'websiteVisits', format: 'number', icon: Target, prefix: '' },
-                        { label: 'Leads', key: 'leads', format: 'number', icon: Users, prefix: '' },
-                        { label: 'CPL (USD)', key: 'cpl', format: 'decimal', icon: DollarSign, prefix: '$' },
-                        { label: 'Engagement Rate', key: 'engagementRate', format: 'percent', icon: TrendingUp, prefix: '' },
-                        { label: 'Engagements', key: 'engagements', format: 'number', icon: Users, prefix: '' },
-                      ].map(metric => (
-                        <MetricCard key={metric.key} label={metric.label}
-                          current={reportData.current[metric.key]}
-                          previous={reportData.previous[metric.key]}
-                          format={metric.format} icon={metric.icon} prefix={metric.prefix} />
-                      ))}
+                  {/* Objective Tabs */}
+                  <div className="bg-slate-800 rounded-xl border border-slate-700 mb-6 overflow-hidden">
+                    <div className="flex overflow-x-auto border-b border-slate-700">
+                      {OBJECTIVE_TABS.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = activeObjectiveTab === tab.id;
+                        const count = tab.types === null
+                          ? (reportData?.topCampaigns?.length || 0)
+                          : (reportData?.topCampaigns || []).filter(c => {
+                              const obj = (c.objectiveType || campaignObjectiveMap[String(c.id)] || '').toUpperCase();
+                              return tab.types.some(t => obj.includes(t));
+                            }).length;
+                        const activeColors = {
+                          all:        'border-blue-500    text-blue-400    bg-blue-950/40',
+                          engagement: 'border-yellow-500  text-yellow-400  bg-yellow-950/40',
+                          leads:      'border-purple-500  text-purple-400  bg-purple-950/40',
+                          video:      'border-rose-500    text-rose-400    bg-rose-950/40',
+                          website:    'border-emerald-500 text-emerald-400 bg-emerald-950/40',
+                        };
+                        return (
+                          <button key={tab.id} onClick={() => setActiveObjectiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${
+                              isActive ? `${activeColors[tab.id]} border-b-2` : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-700/50'
+                            }`}>
+                            <Icon className="w-4 h-4" />
+                            {tab.label}
+                            {count > 0 && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                                isActive ? 'bg-slate-700 text-white' : 'bg-slate-700 text-slate-400'
+                              }`}>{count}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="p-6">
+                      <h3 className="text-lg font-bold text-white mb-6">Campaign Performance</h3>
+                      <div className="grid grid-cols-4 gap-4">
+                        {visibleMetrics.map(metric => (
+                          <MetricCard key={metric.key} label={metric.label}
+                            current={reportData.current?.[metric.key] ?? 0}
+                            previous={reportData.previous?.[metric.key] ?? 0}
+                            format={metric.format} icon={metric.icon} prefix={metric.prefix} />
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <TopPerformingBlock title="Top Campaigns" items={reportData.topCampaigns}
-                      accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
-                  </div>
-                  {reportData.topAds && reportData.topAds.length > 0 && (
+                  {/* Breakdown — context-aware based on sidebar selection */}
+                  {selectedAds.length > 0 ? (
                     <div className="mb-6">
-                      <TopPerformingBlock title="Top Performing Ads" items={reportData.topAds}
+                      <TopPerformingBlock
+                        title={`Ad Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                        items={filteredTopAds}
                         accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
+                    </div>
+                  ) : selectedCampaigns.length > 0 ? (
+                    <>
+                      <div className="mb-6">
+                        <TopPerformingBlock
+                          title={`Campaign Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                          items={filteredTopCampaigns}
+                          accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
+                      </div>
+                      {filteredTopAds.length > 0 && (
+                        <div className="mb-6">
+                          <TopPerformingBlock
+                            title={`Ad & Set Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                            items={filteredTopAds}
+                            accountId={primaryAccountId} type="ad" nameMap={adNameMap} />
+                        </div>
+                      )}
+                    </>
+                  ) : selectedCampaignGroups.length > 0 ? (
+                    <div className="mb-6">
+                      <TopPerformingBlock
+                        title={`Campaign Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                        items={filteredTopCampaigns}
+                        accountId={primaryAccountId} type="campaign" nameMap={campaignNameMap} />
+                    </div>
+                  ) : (
+                    <div className="mb-6">
+                      <TopPerformingBlock
+                        title={`Campaign Group Performance${activeObjectiveTab !== 'all' ? ` — ${activeTabConfig.label}` : ''}`}
+                        items={reportData.topCampaignGroups || []}
+                        accountId={primaryAccountId} type="group" nameMap={campaignGroupNameMap} />
                     </div>
                   )}
 

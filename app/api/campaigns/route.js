@@ -11,94 +11,69 @@ export async function POST(request) {
     }
 
     const { accountIds } = await request.json();
-
-    const restHeaders = {
-      'Authorization': `Bearer ${token.accessToken}`,
-      'Linkedin-Version': '202504',
-      'X-RestLi-Protocol-Version': '2.0.0',
-    };
-    const v2Headers = {
-      'Authorization': `Bearer ${token.accessToken}`,
-      'X-RestLi-Protocol-Version': '2.0.0',
-    };
+    if (!accountIds || accountIds.length === 0) return NextResponse.json([]);
 
     const allCampaigns = [];
 
-    for (const accountId of accountIds) {
-      const accountUrn = `urn:li:sponsoredAccount:${accountId}`;
+    await Promise.all(accountIds.map(async (accountId) => {
+      let start = 0;
+      const count = 100;
+      let hasMore = true;
 
-      // Method 1: Fetch campaigns directly via list endpoint
-      const listUrl = `https://api.linkedin.com/rest/adCampaigns?q=search&search.account.values[0]=${encodeURIComponent(accountUrn)}&count=100&fields=id,name,status,objectiveType`;
-      const listRes = await fetch(listUrl, { headers: restHeaders });
+      while (hasMore) {
+        try {
+          const res = await fetch(
+            `https://api.linkedin.com/v2/adCampaignsV2?q=search&search.account.values[0]=urn:li:sponsoredAccount:${accountId}&fields=id,name,status,objectiveType,campaignGroup&count=${count}&start=${start}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token.accessToken}`,
+                'LinkedIn-Version': '202401',
+              },
+            }
+          );
 
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        (listData.elements || []).forEach(c => {
-          if (!allCampaigns.find(x => x.id === c.id)) {
+          if (!res.ok) {
+            console.error(`Campaigns failed for account ${accountId}:`, await res.text());
+            break;
+          }
+
+          const data = await res.json();
+          const elements = data.elements || [];
+
+          elements.forEach(c => {
+            const rawId = c.id;
+            const id = typeof rawId === 'string' && rawId.includes(':')
+              ? parseInt(rawId.split(':').pop())
+              : parseInt(rawId);
+            const name = c.name || c.displayName || `Campaign ${id}`;
+            const groupId = c.campaignGroup
+              ? String(c.campaignGroup).split(':').pop()
+              : null;
             allCampaigns.push({
-              id: c.id,
-              name: c.name || `Campaign ${c.id}`,
-              accountId,
+              id,
+              name,
+              accountId: parseInt(accountId),
               status: c.status || 'ACTIVE',
               objectiveType: c.objectiveType || '',
+              campaignGroupId: groupId,
             });
-          }
-        });
-        console.log(`Fetched ${listData.elements?.length} campaigns via list for account ${accountId}`);
-        continue;
+          });
+
+          const paging = data.paging;
+          hasMore = paging?.total ? start + count < paging.total : elements.length === count;
+          start += count;
+          if (start >= 1000) break;
+        } catch (err) {
+          console.error(`Campaigns error for account ${accountId}:`, err);
+          break;
+        }
       }
+    }));
 
-      console.log(`List endpoint failed (${listRes.status}), falling back to analytics pivot`);
-
-      // Method 2: Fallback via analytics pivot
-      const end = new Date();
-      const start = new Date(Date.now() - 90 * 86400000);
-      const fmt = d => ({ year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() });
-      const s = fmt(start); const e = fmt(end);
-      const dateRangeParam = `dateRange=(start:(year:${s.year},month:${s.month},day:${s.day}),end:(year:${e.year},month:${e.month},day:${e.day}))`;
-      const accountUrn2 = encodeURIComponent(accountUrn);
-      const url = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&timeGranularity=ALL&${dateRangeParam}&accounts=List(${accountUrn2})&fields=impressions,pivotValues`;
-      const res = await fetch(url, { headers: restHeaders });
-      if (!res.ok) { console.error('Analytics failed:', await res.text()); continue; }
-
-      const data = await res.json();
-      const ids = [];
-      (data.elements || []).forEach(el => {
-        const urn = el.pivotValues?.[0];
-        if (urn) {
-          const id = parseInt(urn.split(':').pop());
-          if (!allCampaigns.find(c => c.id === id)) {
-            allCampaigns.push({ id, name: `Campaign ${id}`, accountId, status: 'ACTIVE' });
-            ids.push(id);
-          }
-        }
-      });
-
-      // Fetch names
-      await Promise.all(ids.map(async id => {
-        const idx = allCampaigns.findIndex(c => c.id === id);
-        if (idx === -1) return;
-
-        let res = await fetch(`https://api.linkedin.com/rest/adCampaigns/${id}`, { headers: restHeaders });
-        if (!res.ok) {
-          res = await fetch(`https://api.linkedin.com/v2/adCampaignsV2/${id}`, { headers: v2Headers });
-        }
-        if (res.ok) {
-          const detail = await res.json();
-          const name = detail.name || detail.campaignName || null;
-          if (name) {
-            allCampaigns[idx].name = name;
-            allCampaigns[idx].status = detail.status || 'ACTIVE';
-            allCampaigns[idx].objectiveType = detail.objectiveType || '';
-          }
-        }
-      }));
-    }
-
+    allCampaigns.sort((a, b) => a.name.localeCompare(b.name));
     return NextResponse.json(allCampaigns);
-
   } catch (error) {
-    console.error('Campaigns error:', error);
+    console.error('Campaigns API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
